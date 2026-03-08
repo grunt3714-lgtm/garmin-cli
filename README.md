@@ -159,12 +159,14 @@ garmin profile settings
 Sync your Garmin data to local Parquet files for offline analysis. Sync runs use line-oriented terminal progress and a final summary.
 
 ```bash
-# Sync all data (activities, health, performance)
-# Automatically detects your oldest activity and syncs from there
+# Sync recent data (latest mode)
 garmin sync run
 
 # Sync specific date range
 garmin sync run --from 2025-01-01 --to 2025-12-31
+
+# Backfill historical data
+garmin sync run --backfill
 
 # Sync only activities
 garmin sync run --activities

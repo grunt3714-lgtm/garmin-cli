@@ -16,7 +16,7 @@ use super::auth::refresh_token;
 #[allow(clippy::too_many_arguments)]
 pub async fn run(
     profile: Option<String>,
-    db_path: Option<String>,
+    storage_path: Option<String>,
     activities: bool,
     health: bool,
     performance: bool,
@@ -30,7 +30,7 @@ pub async fn run(
     let (oauth1, oauth2) = refresh_token(&store).await?;
 
     // Open storage
-    let storage_path = db_path
+    let storage_path = storage_path
         .map(std::path::PathBuf::from)
         .unwrap_or_else(default_storage_path);
 
@@ -66,8 +66,8 @@ pub async fn run(
 }
 
 /// Show sync status
-pub async fn status(profile: Option<String>, db_path: Option<String>) -> Result<()> {
-    let storage_path = db_path
+pub async fn status(profile: Option<String>, storage_path: Option<String>) -> Result<()> {
+    let storage_path = storage_path
         .map(std::path::PathBuf::from)
         .unwrap_or_else(default_storage_path);
 
@@ -165,8 +165,8 @@ fn count_partition_files(storage_path: &Path, dirname: &str) -> usize {
 }
 
 /// Reset failed tasks to pending
-pub async fn reset(db_path: Option<String>) -> Result<()> {
-    let storage_path = db_path
+pub async fn reset(storage_path: Option<String>) -> Result<()> {
+    let storage_path = storage_path
         .map(std::path::PathBuf::from)
         .unwrap_or_else(default_storage_path);
 
@@ -186,8 +186,8 @@ pub async fn reset(db_path: Option<String>) -> Result<()> {
 }
 
 /// Clear all pending tasks
-pub async fn clear(db_path: Option<String>) -> Result<()> {
-    let storage_path = db_path
+pub async fn clear(storage_path: Option<String>) -> Result<()> {
+    let storage_path = storage_path
         .map(std::path::PathBuf::from)
         .unwrap_or_else(default_storage_path);
 

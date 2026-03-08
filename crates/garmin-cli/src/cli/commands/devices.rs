@@ -96,15 +96,15 @@ fn truncate(s: &str, max_len: usize) -> String {
 }
 
 /// Show device history from synced activities
-pub async fn history(db_path: Option<String>) -> Result<()> {
-    let storage_path = db_path
+pub async fn history(storage_path: Option<String>) -> Result<()> {
+    let storage_path = storage_path
         .map(std::path::PathBuf::from)
         .unwrap_or_else(default_storage_path);
 
     let activities_path = storage_path.join("activities");
     if !activities_path.exists() {
         println!("No activities found at: {}", activities_path.display());
-        println!("Run 'garmin sync' to sync your activities first.");
+        println!("Run 'garmin sync run' to sync your activities first.");
         return Ok(());
     }
 
@@ -155,7 +155,7 @@ pub async fn history(db_path: Option<String>) -> Result<()> {
 
     if devices.is_empty() {
         println!("No device history found in synced activities.");
-        println!("Make sure you have synced activities with 'garmin sync'.");
+        println!("Make sure you have synced activities with 'garmin sync run'.");
         return Ok(());
     }
 

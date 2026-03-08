@@ -11,8 +11,6 @@ pub enum SyncMode {
     Latest,
     /// Backfill historical data
     Backfill,
-    /// Both latest and backfill in sequence
-    Full,
 }
 
 impl Default for SyncMode {
@@ -26,7 +24,6 @@ impl std::fmt::Display for SyncMode {
         match self {
             SyncMode::Latest => write!(f, "Latest"),
             SyncMode::Backfill => write!(f, "Backfill"),
-            SyncMode::Full => write!(f, "Full"),
         }
     }
 }
@@ -315,7 +312,7 @@ impl SyncProgress {
         match self.sync_mode.load(Ordering::Relaxed) {
             0 => SyncMode::Latest,
             1 => SyncMode::Backfill,
-            _ => SyncMode::Full,
+            _ => SyncMode::Latest,
         }
     }
 

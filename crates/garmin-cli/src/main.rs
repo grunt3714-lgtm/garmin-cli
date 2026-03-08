@@ -285,9 +285,9 @@ enum DeviceCommands {
     },
     /// Show device history from synced activities
     History {
-        /// Database file path
-        #[arg(long)]
-        db: Option<String>,
+        /// Storage directory path
+        #[arg(long = "storage", alias = "db")]
+        storage: Option<String>,
     },
 }
 
@@ -303,9 +303,9 @@ enum ProfileCommands {
 enum SyncCommands {
     /// Run sync operation
     Run {
-        /// Database file path
-        #[arg(long)]
-        db: Option<String>,
+        /// Storage directory path
+        #[arg(long = "storage", alias = "db")]
+        storage: Option<String>,
         /// Sync activities only
         #[arg(long)]
         activities: bool,
@@ -333,21 +333,21 @@ enum SyncCommands {
     },
     /// Show sync status
     Status {
-        /// Database file path
-        #[arg(long)]
-        db: Option<String>,
+        /// Storage directory path
+        #[arg(long = "storage", alias = "db")]
+        storage: Option<String>,
     },
     /// Reset failed tasks to pending
     Reset {
-        /// Database file path
-        #[arg(long)]
-        db: Option<String>,
+        /// Storage directory path
+        #[arg(long = "storage", alias = "db")]
+        storage: Option<String>,
     },
     /// Clear all pending tasks
     Clear {
-        /// Database file path
-        #[arg(long)]
-        db: Option<String>,
+        /// Storage directory path
+        #[arg(long = "storage", alias = "db")]
+        storage: Option<String>,
     },
 }
 
@@ -454,7 +454,7 @@ async fn main() -> garmin_cli::Result<()> {
         Commands::Devices { command } => match command {
             DeviceCommands::List => commands::list_devices(cli.profile).await,
             DeviceCommands::Get { id } => commands::get_device(&id, cli.profile).await,
-            DeviceCommands::History { db } => commands::device_history(db).await,
+            DeviceCommands::History { storage } => commands::device_history(storage).await,
         },
         Commands::Profile { command } => match command {
             ProfileCommands::Show => commands::show_profile(cli.profile).await,
@@ -462,7 +462,7 @@ async fn main() -> garmin_cli::Result<()> {
         },
         Commands::Sync { command } => match command {
             SyncCommands::Run {
-                db,
+                storage,
                 activities,
                 health,
                 performance,
@@ -474,7 +474,7 @@ async fn main() -> garmin_cli::Result<()> {
             } => {
                 commands::sync_run(
                     cli.profile,
-                    db,
+                    storage,
                     activities,
                     health,
                     performance,
@@ -486,9 +486,9 @@ async fn main() -> garmin_cli::Result<()> {
                 )
                 .await
             }
-            SyncCommands::Status { db } => commands::sync_status(cli.profile, db).await,
-            SyncCommands::Reset { db } => commands::sync_reset(db).await,
-            SyncCommands::Clear { db } => commands::sync_clear(db).await,
+            SyncCommands::Status { storage } => commands::sync_status(cli.profile, storage).await,
+            SyncCommands::Reset { storage } => commands::sync_reset(storage).await,
+            SyncCommands::Clear { storage } => commands::sync_clear(storage).await,
         },
     };
 
@@ -517,5 +517,11 @@ mod tests {
     #[test]
     fn rejects_removed_simple_flag() {
         assert!(Cli::try_parse_from(["garmin", "sync", "run", "--simple"]).is_err());
+    }
+
+    #[test]
+    fn accepts_storage_alias_for_sync() {
+        assert!(Cli::try_parse_from(["garmin", "sync", "status", "--storage", "/tmp"]).is_ok());
+        assert!(Cli::try_parse_from(["garmin", "sync", "status", "--db", "/tmp"]).is_ok());
     }
 }

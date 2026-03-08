@@ -35,7 +35,6 @@ fn pipeline_filter(mode: progress::SyncMode) -> Option<SyncPipeline> {
     match mode {
         progress::SyncMode::Latest => Some(SyncPipeline::Frontier),
         progress::SyncMode::Backfill => Some(SyncPipeline::Backfill),
-        progress::SyncMode::Full => None,
     }
 }
 
@@ -407,18 +406,6 @@ impl SyncEngine {
                 progress.set_backfill_range(&from_date, &oldest);
                 progress.set_date_range(&oldest, &from_date);
             }
-            progress::SyncMode::Full => {
-                // Full mode: both latest and backfill ranges
-                let latest_from = today - Duration::days(7);
-                progress.set_latest_range(&latest_from.to_string(), &to_date.to_string());
-
-                let oldest = progress
-                    .get_oldest_activity_date()
-                    .unwrap_or_else(|| (today - Duration::days(365)).to_string());
-                let backfill_from = opts.from_date.map(|d| d.to_string()).unwrap_or(oldest.clone());
-                progress.set_backfill_range(&backfill_from, &oldest);
-                progress.set_date_range(&oldest, &to_date.to_string());
-            }
         }
 
         print_sync_overview(&progress);
@@ -484,25 +471,6 @@ impl SyncEngine {
                 let pending = self.queue.pending_count()?;
                 if pending == 0 {
                     // Mark backfill as complete
-                    self.storage.sync_db.mark_backfill_complete(self.profile_id, "activities")?;
-                    self.storage.sync_db.mark_backfill_complete(self.profile_id, "health")?;
-                    self.storage.sync_db.mark_backfill_complete(self.profile_id, "performance")?;
-                }
-            }
-            progress::SyncMode::Full => {
-                // Update both latest and check backfill completion
-                if opts.sync_activities {
-                    let state = SyncState {
-                        profile_id: self.profile_id,
-                        data_type: "activities".to_string(),
-                        last_sync_date: Some(today),
-                        last_activity_id: None,
-                    };
-                    self.storage.sync_db.update_sync_state(&state)?;
-                }
-
-                let pending = self.queue.pending_count()?;
-                if pending == 0 {
                     self.storage.sync_db.mark_backfill_complete(self.profile_id, "activities")?;
                     self.storage.sync_db.mark_backfill_complete(self.profile_id, "health")?;
                     self.storage.sync_db.mark_backfill_complete(self.profile_id, "performance")?;
@@ -689,11 +657,6 @@ impl SyncEngine {
                 self.plan_latest_sync(opts, progress, today).await
             }
             progress::SyncMode::Backfill => {
-                self.plan_backfill_sync(opts, progress, today).await
-            }
-            progress::SyncMode::Full => {
-                // Full mode: run latest first, then backfill
-                self.plan_latest_sync(opts, progress, today).await?;
                 self.plan_backfill_sync(opts, progress, today).await
             }
         }
@@ -1045,7 +1008,7 @@ pub struct SyncOptions {
     pub force: bool,
     /// Number of concurrent API requests (default: 4)
     pub concurrency: usize,
-    /// Sync mode (Latest, Backfill, or Full)
+    /// Sync mode (Latest or Backfill)
     pub mode: progress::SyncMode,
 }
 
