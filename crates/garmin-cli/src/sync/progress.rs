@@ -350,7 +350,11 @@ impl SyncProgress {
     /// Add an error entry
     pub fn add_error(&self, stream: &'static str, item: String, error: String) {
         let mut errors = self.errors.lock().unwrap();
-        errors.push(ErrorEntry { stream, item, error });
+        errors.push(ErrorEntry {
+            stream,
+            item,
+            error,
+        });
     }
 
     /// Get all errors
@@ -361,12 +365,7 @@ impl SyncProgress {
     /// Get current task description (finds first active stream)
     pub fn get_current_task(&self) -> Option<String> {
         // Check streams in order of typical processing
-        let streams = [
-            &self.activities,
-            &self.gpx,
-            &self.health,
-            &self.performance,
-        ];
+        let streams = [&self.activities, &self.gpx, &self.health, &self.performance];
 
         for stream in streams {
             let current = stream.get_current_item();
@@ -520,8 +519,12 @@ impl std::fmt::Display for PlanningStep {
             PlanningStep::FindingFirstHealth => write!(f, "Finding first health data..."),
             PlanningStep::FindingFirstPerformance => write!(f, "Finding first performance data..."),
             PlanningStep::PlanningActivities => write!(f, "Planning activity sync..."),
-            PlanningStep::PlanningHealth { days } => write!(f, "Planning health sync ({} days)...", days),
-            PlanningStep::PlanningPerformance { weeks } => write!(f, "Planning performance sync ({} weeks)...", weeks),
+            PlanningStep::PlanningHealth { days } => {
+                write!(f, "Planning health sync ({} days)...", days)
+            }
+            PlanningStep::PlanningPerformance { weeks } => {
+                write!(f, "Planning performance sync ({} weeks)...", weeks)
+            }
             PlanningStep::Complete => write!(f, "Planning complete"),
         }
     }

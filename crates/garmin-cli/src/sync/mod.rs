@@ -49,10 +49,7 @@ enum SyncData {
         task_id: i64,
     },
     /// Daily health record
-    Health {
-        record: DailyHealth,
-        task_id: i64,
-    },
+    Health { record: DailyHealth, task_id: i64 },
     /// Performance metrics record
     Performance {
         record: PerformanceMetrics,
@@ -87,7 +84,11 @@ impl SyncEngine {
     }
 
     /// Create a new sync engine with custom storage
-    pub fn with_storage(storage: Storage, client: GarminClient, token: OAuth2Token) -> Result<Self> {
+    pub fn with_storage(
+        storage: Storage,
+        client: GarminClient,
+        token: OAuth2Token,
+    ) -> Result<Self> {
         // Get or create profile (will be updated with display name after API call)
         let profile_id = storage.sync_db.get_or_create_profile("default")?;
 
@@ -293,17 +294,15 @@ impl SyncEngine {
             self.client.get_json(&self.token, &readiness_path).await;
 
         if let Ok(data) = readiness {
-            if data
-                .as_array()
-                .and_then(|arr| arr.first())
-                .is_some()
-            {
+            if data.as_array().and_then(|arr| arr.first()).is_some() {
                 return Ok(true);
             }
         }
 
-        let status_path =
-            format!("/metrics-service/metrics/trainingstatus/aggregated/{}", date);
+        let status_path = format!(
+            "/metrics-service/metrics/trainingstatus/aggregated/{}",
+            date
+        );
         self.rate_limiter.wait().await;
         let status: std::result::Result<serde_json::Value, _> =
             self.client.get_json(&self.token, &status_path).await;
@@ -402,7 +401,10 @@ impl SyncEngine {
                 let oldest = progress
                     .get_oldest_activity_date()
                     .unwrap_or_else(|| (today - Duration::days(365)).to_string());
-                let from_date = opts.from_date.map(|d| d.to_string()).unwrap_or(oldest.clone());
+                let from_date = opts
+                    .from_date
+                    .map(|d| d.to_string())
+                    .unwrap_or(oldest.clone());
                 progress.set_backfill_range(&from_date, &oldest);
                 progress.set_date_range(&oldest, &from_date);
             }
@@ -420,7 +422,9 @@ impl SyncEngine {
                 run_progress_reporter(reporter_progress).await;
             });
 
-            let result = self.run_with_progress_tracking(opts, progress.clone()).await;
+            let result = self
+                .run_with_progress_tracking(opts, progress.clone())
+                .await;
             progress.request_shutdown();
             let _ = reporter_handle.await;
             result
@@ -441,7 +445,11 @@ impl SyncEngine {
     }
 
     /// Update sync state after successful sync completion
-    async fn update_sync_state_after_completion(&self, opts: &SyncOptions, today: NaiveDate) -> Result<()> {
+    async fn update_sync_state_after_completion(
+        &self,
+        opts: &SyncOptions,
+        today: NaiveDate,
+    ) -> Result<()> {
         use crate::db::models::SyncState;
 
         match opts.mode {
@@ -471,9 +479,15 @@ impl SyncEngine {
                 let pending = self.queue.pending_count()?;
                 if pending == 0 {
                     // Mark backfill as complete
-                    self.storage.sync_db.mark_backfill_complete(self.profile_id, "activities")?;
-                    self.storage.sync_db.mark_backfill_complete(self.profile_id, "health")?;
-                    self.storage.sync_db.mark_backfill_complete(self.profile_id, "performance")?;
+                    self.storage
+                        .sync_db
+                        .mark_backfill_complete(self.profile_id, "activities")?;
+                    self.storage
+                        .sync_db
+                        .mark_backfill_complete(self.profile_id, "health")?;
+                    self.storage
+                        .sync_db
+                        .mark_backfill_complete(self.profile_id, "performance")?;
                 }
             }
         }
@@ -514,7 +528,7 @@ impl SyncEngine {
             rate_limiter,
             pipeline_filter(opts.mode),
         )
-            .await
+        .await
     }
 
     pub(crate) async fn run_parallel_with_resources(
@@ -649,16 +663,16 @@ impl SyncEngine {
     }
 
     /// Plan sync tasks with progress tracking.
-    async fn plan_sync_with_progress(&mut self, opts: &SyncOptions, progress: &SyncProgress) -> Result<()> {
+    async fn plan_sync_with_progress(
+        &mut self,
+        opts: &SyncOptions,
+        progress: &SyncProgress,
+    ) -> Result<()> {
         let today = Utc::now().date_naive();
 
         match opts.mode {
-            progress::SyncMode::Latest => {
-                self.plan_latest_sync(opts, progress, today).await
-            }
-            progress::SyncMode::Backfill => {
-                self.plan_backfill_sync(opts, progress, today).await
-            }
+            progress::SyncMode::Latest => self.plan_latest_sync(opts, progress, today).await,
+            progress::SyncMode::Backfill => self.plan_backfill_sync(opts, progress, today).await,
         }
     }
 
@@ -670,7 +684,10 @@ impl SyncEngine {
         today: NaiveDate,
     ) -> Result<()> {
         // Get last sync date from DB, default to 7 days ago
-        let last_sync = self.storage.sync_db.get_sync_state(self.profile_id, "activities")?;
+        let last_sync = self
+            .storage
+            .sync_db
+            .get_sync_state(self.profile_id, "activities")?;
         let from_date = opts.from_date.unwrap_or_else(|| {
             last_sync
                 .and_then(|s| s.last_sync_date)
@@ -726,10 +743,11 @@ impl SyncEngine {
             Some((frontier, _target, complete)) => (frontier, complete),
             None => {
                 // Initialize frontier from last_sync_date or today
-                let last_sync = self.storage.sync_db.get_sync_state(self.profile_id, "activities")?;
-                let frontier = last_sync
-                    .and_then(|s| s.last_sync_date)
-                    .unwrap_or(today);
+                let last_sync = self
+                    .storage
+                    .sync_db
+                    .get_sync_state(self.profile_id, "activities")?;
+                let frontier = last_sync.and_then(|s| s.last_sync_date).unwrap_or(today);
 
                 // Initialize backfill state
                 self.storage.sync_db.set_backfill_state(
@@ -753,7 +771,11 @@ impl SyncEngine {
         // Plan activity sync with known totals
         if opts.sync_activities && !activities_complete {
             progress.set_planning_step(PlanningStep::PlanningActivities);
-            self.plan_activities_sync(SyncPipeline::Backfill, Some(activity_from), Some(activity_to))?;
+            self.plan_activities_sync(
+                SyncPipeline::Backfill,
+                Some(activity_from),
+                Some(activity_to),
+            )?;
             if total_activities > 0 {
                 progress.activities.set_total(total_activities);
                 progress.gpx.set_total(estimated_gps);
@@ -771,8 +793,9 @@ impl SyncEngine {
                 None => {
                     let search_from = activity_from;
                     let search_to = activity_to;
-                    let first_health =
-                        self.find_first_health_date(Some(progress), search_from, search_to).await?;
+                    let first_health = self
+                        .find_first_health_date(Some(progress), search_from, search_to)
+                        .await?;
                     match first_health {
                         Some(first) => {
                             self.storage.sync_db.set_backfill_state(
@@ -825,9 +848,9 @@ impl SyncEngine {
                 None => {
                     let search_from = activity_from;
                     let search_to = activity_to;
-                    let first_perf =
-                        self.find_first_performance_date(Some(progress), search_from, search_to)
-                            .await?;
+                    let first_perf = self
+                        .find_first_performance_date(Some(progress), search_from, search_to)
+                        .await?;
                     match first_perf {
                         Some(first) => {
                             self.storage.sync_db.set_backfill_state(
@@ -858,7 +881,9 @@ impl SyncEngine {
                 let perf_to = activity_to;
                 if perf_from <= perf_to {
                     let total_weeks = ((perf_to - perf_from).num_days().max(0) as u32 / 7).max(1);
-                    progress.set_planning_step(PlanningStep::PlanningPerformance { weeks: total_weeks });
+                    progress.set_planning_step(PlanningStep::PlanningPerformance {
+                        weeks: total_weeks,
+                    });
                     self.plan_performance_sync(
                         perf_from,
                         perf_to,
@@ -905,7 +930,12 @@ impl SyncEngine {
         let mut count = 0;
         let mut date = from;
         while date <= to {
-            if force || !self.storage.parquet.has_daily_health(self.profile_id, date)? {
+            if force
+                || !self
+                    .storage
+                    .parquet
+                    .has_daily_health(self.profile_id, date)?
+            {
                 let task = SyncTask::new(
                     self.profile_id,
                     pipeline,
@@ -931,7 +961,12 @@ impl SyncEngine {
         let mut count = 0;
         let mut date = from;
         while date <= to {
-            if force || !self.storage.parquet.has_performance_metrics(self.profile_id, date)? {
+            if force
+                || !self
+                    .storage
+                    .parquet
+                    .has_performance_metrics(self.profile_id, date)?
+            {
                 let task = SyncTask::new(
                     self.profile_id,
                     pipeline,
@@ -944,7 +979,6 @@ impl SyncEngine {
         }
         Ok(count)
     }
-
 }
 
 fn print_sync_overview(progress: &SyncProgress) {
@@ -1132,10 +1166,19 @@ fn fail_progress_for_task(task: &SyncTask, progress: &SyncProgress, error: &str)
             progress.activities.clear_current_item();
             ("Activities", format!("{}-{}", start, start + limit))
         }
-        SyncTaskType::DownloadGpx { activity_id, activity_name, .. } => {
+        SyncTaskType::DownloadGpx {
+            activity_id,
+            activity_name,
+            ..
+        } => {
             progress.gpx.fail_one();
             progress.gpx.clear_current_item();
-            ("GPX", activity_name.clone().unwrap_or_else(|| activity_id.to_string()))
+            (
+                "GPX",
+                activity_name
+                    .clone()
+                    .unwrap_or_else(|| activity_id.to_string()),
+            )
         }
         SyncTaskType::DailyHealth { date } => {
             progress.health.fail_one();
@@ -1180,7 +1223,9 @@ fn record_write_failure(data: &SyncData, progress: &SyncProgress, error: &str) {
             progress.performance.clear_current_item();
             progress.add_error("Performance", record.date.to_string(), error.to_string());
         }
-        SyncData::TrackPoints { activity_id, date, .. } => {
+        SyncData::TrackPoints {
+            activity_id, date, ..
+        } => {
             progress.gpx.fail_one();
             progress.gpx.clear_current_item();
             progress.add_error(
@@ -1231,10 +1276,7 @@ async fn producer_loop(
                 // Queue is empty, but consumers might be adding new tasks
                 // Wait a bit and retry before giving up
                 empty_count += 1;
-                if should_exit_when_idle(
-                    empty_count,
-                    in_flight.load(Ordering::Relaxed),
-                ) {
+                if should_exit_when_idle(empty_count, in_flight.load(Ordering::Relaxed)) {
                     break; // No more tasks after multiple retries
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -1264,11 +1306,9 @@ async fn producer_loop(
                 SyncTaskType::DailyHealth { date } => {
                     parquet.has_daily_health(profile_id, *date).unwrap_or(false)
                 }
-                SyncTaskType::Performance { date } => {
-                    parquet
-                        .has_performance_metrics(profile_id, *date)
-                        .unwrap_or(false)
-                }
+                SyncTaskType::Performance { date } => parquet
+                    .has_performance_metrics(profile_id, *date)
+                    .unwrap_or(false),
                 SyncTaskType::DownloadGpx {
                     activity_id,
                     activity_date,
@@ -1300,14 +1340,7 @@ async fn producer_loop(
         progress.record_request();
 
         // Fetch data based on task type
-        let result = fetch_task_data(
-            &task,
-            &client,
-            &token,
-            &display_name,
-            profile_id,
-        )
-        .await;
+        let result = fetch_task_data(&task, &client, &token, &display_name, profile_id).await;
 
         match result {
             Ok(data) => {
@@ -1370,10 +1403,14 @@ fn first_entry(value: &serde_json::Value) -> Option<&serde_json::Value> {
 
 fn parse_sleep_metrics(
     value: Option<&serde_json::Value>,
-) -> (Option<i32>, Option<i32>, Option<i32>, Option<i32>, Option<i32>) {
-    let dto = value
-        .and_then(|v| v.get("dailySleepDTO"))
-        .or(value);
+) -> (
+    Option<i32>,
+    Option<i32>,
+    Option<i32>,
+    Option<i32>,
+    Option<i32>,
+) {
+    let dto = value.and_then(|v| v.get("dailySleepDTO")).or(value);
 
     let dto = match dto {
         Some(dto) => dto,
@@ -1404,9 +1441,7 @@ fn parse_sleep_metrics(
 fn parse_hrv_metrics(
     value: Option<&serde_json::Value>,
 ) -> (Option<i32>, Option<i32>, Option<String>) {
-    let summary = value
-        .and_then(|v| v.get("hrvSummary"))
-        .or(value);
+    let summary = value.and_then(|v| v.get("hrvSummary")).or(value);
 
     let summary = match summary {
         Some(summary) => summary,
@@ -1479,11 +1514,7 @@ fn parse_training_status(value: Option<&serde_json::Value>, date: NaiveDate) -> 
         .and_then(|v| v.as_object())
     {
         for entry in latest.values() {
-            if entry
-                .get("calendarDate")
-                .and_then(|v| v.as_str())
-                == Some(date_str.as_str())
-            {
+            if entry.get("calendarDate").and_then(|v| v.as_str()) == Some(date_str.as_str()) {
                 return entry
                     .get("trainingStatusFeedbackPhrase")
                     .and_then(|v| v.as_str())
@@ -1494,11 +1525,7 @@ fn parse_training_status(value: Option<&serde_json::Value>, date: NaiveDate) -> 
 
     if let Some(history) = root.get("trainingStatusHistory").and_then(|v| v.as_array()) {
         for entry in history {
-            if entry
-                .get("calendarDate")
-                .and_then(|v| v.as_str())
-                == Some(date_str.as_str())
-            {
+            if entry.get("calendarDate").and_then(|v| v.as_str()) == Some(date_str.as_str()) {
                 return entry
                     .get("trainingStatusFeedbackPhrase")
                     .and_then(|v| v.as_str())
@@ -1665,15 +1692,16 @@ async fn fetch_task_data(
                 "/wellness-service/wellness/dailySleepData/{}?date={}",
                 display_name, date
             );
-            let sleep_data: Option<serde_json::Value> = match client.get_json(token, &sleep_path).await
-            {
-                Ok(data) => Some(data),
-                Err(GarminError::NotFound(_)) | Err(GarminError::Api { .. }) => None,
-                Err(e) => return Err(e),
-            };
+            let sleep_data: Option<serde_json::Value> =
+                match client.get_json(token, &sleep_path).await {
+                    Ok(data) => Some(data),
+                    Err(GarminError::NotFound(_)) | Err(GarminError::Api { .. }) => None,
+                    Err(e) => return Err(e),
+                };
 
             let hrv_path = format!("/hrv-service/hrv/{}", date);
-            let hrv_data: Option<serde_json::Value> = match client.get_json(token, &hrv_path).await {
+            let hrv_data: Option<serde_json::Value> = match client.get_json(token, &hrv_path).await
+            {
                 Ok(data) => Some(data),
                 Err(GarminError::NotFound(_)) | Err(GarminError::Api { .. }) => None,
                 Err(e) => return Err(e),
@@ -1681,43 +1709,88 @@ async fn fetch_task_data(
 
             let (sleep_total, deep_sleep, light_sleep, rem_sleep, sleep_score) =
                 parse_sleep_metrics(sleep_data.as_ref());
-            let (hrv_weekly_avg, hrv_last_night, hrv_status) =
-                parse_hrv_metrics(hrv_data.as_ref());
+            let (hrv_weekly_avg, hrv_last_night, hrv_status) = parse_hrv_metrics(hrv_data.as_ref());
 
             let record = DailyHealth {
                 id: None,
                 profile_id,
                 date: *date,
-                steps: health.get("totalSteps").and_then(|v| v.as_i64()).map(|v| v as i32),
-                step_goal: health.get("dailyStepGoal").and_then(|v| v.as_i64()).map(|v| v as i32),
-                total_calories: health.get("totalKilocalories").and_then(|v| v.as_i64()).map(|v| v as i32),
-                active_calories: health.get("activeKilocalories").and_then(|v| v.as_i64()).map(|v| v as i32),
-                bmr_calories: health.get("bmrKilocalories").and_then(|v| v.as_i64()).map(|v| v as i32),
-                resting_hr: health.get("restingHeartRate").and_then(|v| v.as_i64()).map(|v| v as i32),
-                sleep_seconds: sleep_total
-                    .or_else(|| {
-                        health
-                            .get("sleepingSeconds")
-                            .and_then(|v| v.as_i64())
-                            .map(|v| v as i32)
-                    }),
+                steps: health
+                    .get("totalSteps")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                step_goal: health
+                    .get("dailyStepGoal")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                total_calories: health
+                    .get("totalKilocalories")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                active_calories: health
+                    .get("activeKilocalories")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                bmr_calories: health
+                    .get("bmrKilocalories")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                resting_hr: health
+                    .get("restingHeartRate")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                sleep_seconds: sleep_total.or_else(|| {
+                    health
+                        .get("sleepingSeconds")
+                        .and_then(|v| v.as_i64())
+                        .map(|v| v as i32)
+                }),
                 deep_sleep_seconds: deep_sleep,
                 light_sleep_seconds: light_sleep,
                 rem_sleep_seconds: rem_sleep,
                 sleep_score,
-                avg_stress: health.get("averageStressLevel").and_then(|v| v.as_i64()).map(|v| v as i32),
-                max_stress: health.get("maxStressLevel").and_then(|v| v.as_i64()).map(|v| v as i32),
-                body_battery_start: health.get("bodyBatteryChargedValue").and_then(|v| v.as_i64()).map(|v| v as i32),
-                body_battery_end: health.get("bodyBatteryDrainedValue").and_then(|v| v.as_i64()).map(|v| v as i32),
+                avg_stress: health
+                    .get("averageStressLevel")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                max_stress: health
+                    .get("maxStressLevel")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                body_battery_start: health
+                    .get("bodyBatteryChargedValue")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                body_battery_end: health
+                    .get("bodyBatteryDrainedValue")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
                 hrv_weekly_avg,
                 hrv_last_night,
                 hrv_status,
-                avg_respiration: health.get("averageRespirationValue").and_then(|v| v.as_f64()),
-                avg_spo2: health.get("averageSpo2Value").and_then(|v| v.as_i64()).map(|v| v as i32),
-                lowest_spo2: health.get("lowestSpo2Value").and_then(|v| v.as_i64()).map(|v| v as i32),
-                hydration_ml: health.get("hydrationIntakeGoal").and_then(|v| v.as_i64()).map(|v| v as i32),
-                moderate_intensity_min: health.get("moderateIntensityMinutes").and_then(|v| v.as_i64()).map(|v| v as i32),
-                vigorous_intensity_min: health.get("vigorousIntensityMinutes").and_then(|v| v.as_i64()).map(|v| v as i32),
+                avg_respiration: health
+                    .get("averageRespirationValue")
+                    .and_then(|v| v.as_f64()),
+                avg_spo2: health
+                    .get("averageSpo2Value")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                lowest_spo2: health
+                    .get("lowestSpo2Value")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                hydration_ml: health
+                    .get("hydrationIntakeGoal")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                moderate_intensity_min: health
+                    .get("moderateIntensityMinutes")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
+                vigorous_intensity_min: health
+                    .get("vigorousIntensityMinutes")
+                    .and_then(|v| v.as_i64())
+                    .map(|v| v as i32),
                 raw_json: Some(health),
             };
 
@@ -1725,10 +1798,7 @@ async fn fetch_task_data(
         }
 
         SyncTaskType::Performance { date } => {
-            let vo2_path = format!(
-                "/metrics-service/metrics/maxmet/daily/{}/{}",
-                date, date
-            );
+            let vo2_path = format!("/metrics-service/metrics/maxmet/daily/{}/{}", date, date);
             let vo2max: Option<serde_json::Value> = match client.get_json(token, &vo2_path).await {
                 Ok(data) => Some(data),
                 Err(GarminError::NotFound(_)) | Err(GarminError::Api { .. }) => None,
@@ -1759,7 +1829,10 @@ async fn fetch_task_data(
             let training_status: Option<serde_json::Value> =
                 client.get_json(token, &status_path).await.ok();
 
-            let endurance_path = format!("/metrics-service/metrics/endurancescore?calendarDate={}", date);
+            let endurance_path = format!(
+                "/metrics-service/metrics/endurancescore?calendarDate={}",
+                date
+            );
             let endurance_score_data: Option<serde_json::Value> =
                 match client.get_json(token, &endurance_path).await {
                     Ok(data) => Some(data),
@@ -1784,8 +1857,8 @@ async fn fetch_task_data(
                 };
 
             let vo2max_value = parse_vo2max_value(vo2max.as_ref());
-            let fitness_age =
-                parse_fitness_age(fitness_age_data.as_ref()).or_else(|| parse_vo2max_fitness_age(vo2max.as_ref()));
+            let fitness_age = parse_fitness_age(fitness_age_data.as_ref())
+                .or_else(|| parse_vo2max_fitness_age(vo2max.as_ref()));
 
             let readiness_entry = training_readiness
                 .as_ref()
@@ -1827,7 +1900,9 @@ async fn fetch_task_data(
 
         _ => {
             // Other task types not implemented for parallel yet
-            Err(GarminError::invalid_response("Unsupported task type for parallel sync"))
+            Err(GarminError::invalid_response(
+                "Unsupported task type for parallel sync",
+            ))
         }
     }
 }
@@ -1852,32 +1927,67 @@ fn parse_activity(activity: &serde_json::Value, profile_id: i32) -> Result<Activ
     Ok(Activity {
         activity_id,
         profile_id,
-        activity_name: activity.get("activityName").and_then(|v| v.as_str()).map(|s| s.to_string()),
-        activity_type: activity.get("activityType").and_then(|v| v.get("typeKey")).and_then(|v| v.as_str()).map(|s| s.to_string()),
+        activity_name: activity
+            .get("activityName")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+        activity_type: activity
+            .get("activityType")
+            .and_then(|v| v.get("typeKey"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
         start_time_local,
         start_time_gmt,
         duration_sec: activity.get("duration").and_then(|v| v.as_f64()),
         distance_m: activity.get("distance").and_then(|v| v.as_f64()),
-        calories: activity.get("calories").and_then(|v| v.as_i64()).map(|v| v as i32),
-        avg_hr: activity.get("averageHR").and_then(|v| v.as_i64()).map(|v| v as i32),
-        max_hr: activity.get("maxHR").and_then(|v| v.as_i64()).map(|v| v as i32),
+        calories: activity
+            .get("calories")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32),
+        avg_hr: activity
+            .get("averageHR")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32),
+        max_hr: activity
+            .get("maxHR")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32),
         avg_speed: activity.get("averageSpeed").and_then(|v| v.as_f64()),
         max_speed: activity.get("maxSpeed").and_then(|v| v.as_f64()),
         elevation_gain: activity.get("elevationGain").and_then(|v| v.as_f64()),
         elevation_loss: activity.get("elevationLoss").and_then(|v| v.as_f64()),
-        avg_cadence: activity.get("averageRunningCadenceInStepsPerMinute").and_then(|v| v.as_f64()),
-        avg_power: activity.get("avgPower").and_then(|v| v.as_i64()).map(|v| v as i32),
-        normalized_power: activity.get("normPower").and_then(|v| v.as_i64()).map(|v| v as i32),
-        training_effect: activity.get("aerobicTrainingEffect").and_then(|v| v.as_f64()),
-        training_load: activity.get("activityTrainingLoad").and_then(|v| v.as_f64()),
+        avg_cadence: activity
+            .get("averageRunningCadenceInStepsPerMinute")
+            .and_then(|v| v.as_f64()),
+        avg_power: activity
+            .get("avgPower")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32),
+        normalized_power: activity
+            .get("normPower")
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32),
+        training_effect: activity
+            .get("aerobicTrainingEffect")
+            .and_then(|v| v.as_f64()),
+        training_load: activity
+            .get("activityTrainingLoad")
+            .and_then(|v| v.as_f64()),
         start_lat: activity.get("startLatitude").and_then(|v| v.as_f64()),
         start_lon: activity.get("startLongitude").and_then(|v| v.as_f64()),
         end_lat: activity.get("endLatitude").and_then(|v| v.as_f64()),
         end_lon: activity.get("endLongitude").and_then(|v| v.as_f64()),
-        ground_contact_time: activity.get("avgGroundContactTime").and_then(|v| v.as_f64()),
-        vertical_oscillation: activity.get("avgVerticalOscillation").and_then(|v| v.as_f64()),
+        ground_contact_time: activity
+            .get("avgGroundContactTime")
+            .and_then(|v| v.as_f64()),
+        vertical_oscillation: activity
+            .get("avgVerticalOscillation")
+            .and_then(|v| v.as_f64()),
         stride_length: activity.get("avgStrideLength").and_then(|v| v.as_f64()),
-        location_name: activity.get("locationName").and_then(|v| v.as_str()).map(|s| s.to_string()),
+        location_name: activity
+            .get("locationName")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
         raw_json: Some(activity.clone()),
     })
 }
@@ -2017,7 +2127,9 @@ async fn consumer_loop(
             }
 
             SyncData::Performance { record, task_id } => {
-                let result = parquet.upsert_performance_metrics_async(&[record.clone()]).await;
+                let result = parquet
+                    .upsert_performance_metrics_async(&[record.clone()])
+                    .await;
                 (result, *task_id, "Performance")
             }
 
@@ -2094,8 +2206,8 @@ async fn consumer_loop(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDate;
     use crate::db::models::TaskStatus;
+    use chrono::NaiveDate;
     use serde_json::json;
     use wiremock::matchers::{method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -2383,7 +2495,9 @@ mod tests {
         let vo2_fixture: serde_json::Value =
             serde_json::from_str(include_str!("../../tests/fixtures/vo2max.json")).unwrap();
         Mock::given(method("GET"))
-            .and(path("/metrics-service/metrics/maxmet/daily/2025-12-10/2025-12-10"))
+            .and(path(
+                "/metrics-service/metrics/maxmet/daily/2025-12-10/2025-12-10",
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_json(vo2_fixture))
             .mount(&server)
             .await;
@@ -2392,7 +2506,9 @@ mod tests {
             serde_json::from_str(include_str!("../../tests/fixtures/race_predictions.json"))
                 .unwrap();
         Mock::given(method("GET"))
-            .and(path("/metrics-service/metrics/racepredictions/daily/TestUser"))
+            .and(path(
+                "/metrics-service/metrics/racepredictions/daily/TestUser",
+            ))
             .and(query_param("fromCalendarDate", "2025-12-10"))
             .and(query_param("toCalendarDate", "2025-12-10"))
             .respond_with(ResponseTemplate::new(200).set_body_json(race_fixture))
@@ -2403,7 +2519,9 @@ mod tests {
             serde_json::from_str(include_str!("../../tests/fixtures/training_readiness.json"))
                 .unwrap();
         Mock::given(method("GET"))
-            .and(path("/metrics-service/metrics/trainingreadiness/2025-12-10"))
+            .and(path(
+                "/metrics-service/metrics/trainingreadiness/2025-12-10",
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_json(readiness_fixture))
             .mount(&server)
             .await;
@@ -2419,7 +2537,9 @@ mod tests {
             }
         });
         Mock::given(method("GET"))
-            .and(path("/metrics-service/metrics/trainingstatus/aggregated/2025-12-10"))
+            .and(path(
+                "/metrics-service/metrics/trainingstatus/aggregated/2025-12-10",
+            ))
             .respond_with(ResponseTemplate::new(200).set_body_json(training_status_fixture))
             .mount(&server)
             .await;

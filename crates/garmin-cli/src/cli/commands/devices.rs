@@ -109,8 +109,8 @@ pub async fn history(storage_path: Option<String>) -> Result<()> {
     }
 
     // Use DuckDB to query Parquet files with glob pattern
-    let conn = Connection::open_in_memory()
-        .map_err(|e| crate::GarminError::Database(e.to_string()))?;
+    let conn =
+        Connection::open_in_memory().map_err(|e| crate::GarminError::Database(e.to_string()))?;
 
     let glob_pattern = format!("{}/*.parquet", activities_path.display());
 

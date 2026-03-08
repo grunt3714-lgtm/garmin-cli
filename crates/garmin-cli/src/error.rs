@@ -70,14 +70,17 @@ fn parse_db_lock_info(message: &str) -> Option<DbLockInfo> {
 
     if message.contains("Could not set lock on file") {
         let path_start = message.find("file \"").map(|idx| idx + 6);
-        let path_end = path_start.and_then(|start| message[start..].find('"').map(|end| start + end));
+        let path_end =
+            path_start.and_then(|start| message[start..].find('"').map(|end| start + end));
         if let (Some(start), Some(end)) = (path_start, path_end) {
             info.path = Some(message[start..end].to_string());
         }
 
-        let holder_start = message.find("Conflicting lock is held in ").map(|idx| idx + 31);
-        let holder_end = holder_start
-            .and_then(|start| message[start..].find(" (PID ").map(|end| start + end));
+        let holder_start = message
+            .find("Conflicting lock is held in ")
+            .map(|idx| idx + 31);
+        let holder_end =
+            holder_start.and_then(|start| message[start..].find(" (PID ").map(|end| start + end));
         if let (Some(start), Some(end)) = (holder_start, holder_end) {
             info.holder = Some(message[start..end].to_string());
         }

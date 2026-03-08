@@ -49,19 +49,14 @@ impl TaskQueue {
 
     /// Pop the next task using round-robin across primary task types
     pub fn pop_round_robin(&mut self) -> Result<Option<SyncTask>> {
-        const TASK_TYPES: [&str; 4] = [
-            "activities",
-            "download_gpx",
-            "performance",
-            "daily_health",
-        ];
+        const TASK_TYPES: [&str; 4] = ["activities", "download_gpx", "performance", "daily_health"];
 
         for _ in 0..TASK_TYPES.len() {
             let idx = self.rr_index % TASK_TYPES.len();
             self.rr_index = self.rr_index.wrapping_add(1);
-            if let Some(task) = self
-                .sync_db
-                .pop_task_by_type(self.profile_id, TASK_TYPES[idx], self.pipeline)?
+            if let Some(task) =
+                self.sync_db
+                    .pop_task_by_type(self.profile_id, TASK_TYPES[idx], self.pipeline)?
             {
                 return Ok(Some(task));
             }
@@ -76,19 +71,14 @@ impl TaskQueue {
         &mut self,
         pipeline: Option<SyncPipeline>,
     ) -> Result<Option<SyncTask>> {
-        const TASK_TYPES: [&str; 4] = [
-            "activities",
-            "download_gpx",
-            "performance",
-            "daily_health",
-        ];
+        const TASK_TYPES: [&str; 4] = ["activities", "download_gpx", "performance", "daily_health"];
 
         for _ in 0..TASK_TYPES.len() {
             let idx = self.rr_index % TASK_TYPES.len();
             self.rr_index = self.rr_index.wrapping_add(1);
-            if let Some(task) = self
-                .sync_db
-                .pop_task_by_type(self.profile_id, TASK_TYPES[idx], pipeline)?
+            if let Some(task) =
+                self.sync_db
+                    .pop_task_by_type(self.profile_id, TASK_TYPES[idx], pipeline)?
             {
                 return Ok(Some(task));
             }
@@ -109,7 +99,8 @@ impl TaskQueue {
 
     /// Mark a task as failed with retry
     pub fn mark_failed(&self, task_id: i64, error: &str, retry_after: Duration) -> Result<()> {
-        self.sync_db.mark_task_failed(task_id, error, retry_after.num_seconds())
+        self.sync_db
+            .mark_task_failed(task_id, error, retry_after.num_seconds())
     }
 
     /// Recover tasks that were in progress (crashed)
@@ -119,14 +110,12 @@ impl TaskQueue {
 
     /// Get count of pending tasks
     pub fn pending_count(&self) -> Result<u32> {
-        self.sync_db.count_pending_tasks(self.profile_id, self.pipeline)
+        self.sync_db
+            .count_pending_tasks(self.profile_id, self.pipeline)
     }
 
     /// Get count of pending tasks for a pipeline
-    pub fn pending_count_with_pipeline(
-        &self,
-        pipeline: Option<SyncPipeline>,
-    ) -> Result<u32> {
+    pub fn pending_count_with_pipeline(&self, pipeline: Option<SyncPipeline>) -> Result<u32> {
         self.sync_db.count_pending_tasks(self.profile_id, pipeline)
     }
 
@@ -147,7 +136,8 @@ impl TaskQueue {
 
     /// Get task counts by type (activities, gpx, health, performance)
     pub fn count_by_type(&self) -> Result<(u32, u32, u32, u32)> {
-        self.sync_db.count_tasks_by_type(self.profile_id, self.pipeline)
+        self.sync_db
+            .count_tasks_by_type(self.profile_id, self.pipeline)
     }
 
     /// Clear completed tasks older than given days
@@ -233,7 +223,12 @@ impl SharedTaskQueue {
     }
 
     /// Mark a task as failed with retry (thread-safe)
-    pub async fn mark_failed(&self, task_id: i64, error: &str, retry_after: Duration) -> Result<()> {
+    pub async fn mark_failed(
+        &self,
+        task_id: i64,
+        error: &str,
+        retry_after: Duration,
+    ) -> Result<()> {
         let guard = self.inner.lock().await;
         guard.mark_failed(task_id, error, retry_after)
     }
@@ -245,10 +240,7 @@ impl SharedTaskQueue {
     }
 
     /// Get count of pending tasks for a pipeline (thread-safe)
-    pub async fn pending_count_with_pipeline(
-        &self,
-        pipeline: Option<SyncPipeline>,
-    ) -> Result<u32> {
+    pub async fn pending_count_with_pipeline(&self, pipeline: Option<SyncPipeline>) -> Result<u32> {
         let guard = self.inner.lock().await;
         guard.pending_count_with_pipeline(pipeline)
     }
@@ -481,10 +473,16 @@ mod tests {
         let id_frontier = queue.push(frontier_task).unwrap();
         let id_backfill = queue.push(backfill_task).unwrap();
 
-        let popped_backfill = queue.pop_with_pipeline(Some(SyncPipeline::Backfill)).unwrap().unwrap();
+        let popped_backfill = queue
+            .pop_with_pipeline(Some(SyncPipeline::Backfill))
+            .unwrap()
+            .unwrap();
         assert_eq!(popped_backfill.id, Some(id_backfill));
 
-        let popped_frontier = queue.pop_with_pipeline(Some(SyncPipeline::Frontier)).unwrap().unwrap();
+        let popped_frontier = queue
+            .pop_with_pipeline(Some(SyncPipeline::Frontier))
+            .unwrap()
+            .unwrap();
         assert_eq!(popped_frontier.id, Some(id_frontier));
     }
 }

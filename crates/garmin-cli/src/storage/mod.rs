@@ -95,10 +95,7 @@ impl Storage {
     /// Open in-memory storage (for testing)
     pub fn open_in_memory(temp_path: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(&temp_path).map_err(|e| {
-            crate::error::GarminError::Database(format!(
-                "Failed to create temp directory: {}",
-                e
-            ))
+            crate::error::GarminError::Database(format!("Failed to create temp directory: {}", e))
         })?;
 
         let parquet = ParquetStore::new(&temp_path);

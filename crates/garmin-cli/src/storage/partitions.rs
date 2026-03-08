@@ -43,9 +43,7 @@ impl EntityType {
                 // Daily: YYYY-MM-DD
                 date.format("%Y-%m-%d").to_string()
             }
-            EntityType::DailyHealth
-            | EntityType::PerformanceMetrics
-            | EntityType::Weight => {
+            EntityType::DailyHealth | EntityType::PerformanceMetrics | EntityType::Weight => {
                 // Monthly: YYYY-MM
                 date.format("%Y-%m").to_string()
             }
@@ -126,7 +124,10 @@ mod tests {
 
     #[test]
     fn test_glob_patterns() {
-        assert_eq!(EntityType::Activities.glob_pattern(), "activities/*.parquet");
+        assert_eq!(
+            EntityType::Activities.glob_pattern(),
+            "activities/*.parquet"
+        );
         assert_eq!(EntityType::Profiles.glob_pattern(), "profiles.parquet");
     }
 }

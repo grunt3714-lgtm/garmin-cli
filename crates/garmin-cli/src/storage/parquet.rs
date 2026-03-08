@@ -18,7 +18,9 @@ use parquet::basic::Compression;
 use parquet::file::properties::WriterProperties;
 use tokio::sync::Mutex as TokioMutex;
 
-use crate::db::models::{Activity, DailyHealth, PerformanceMetrics, Profile, TrackPoint, WeightEntry};
+use crate::db::models::{
+    Activity, DailyHealth, PerformanceMetrics, Profile, TrackPoint, WeightEntry,
+};
 use crate::error::{GarminError, Result};
 
 use super::partitions::EntityType;
@@ -124,9 +126,8 @@ impl ParquetStore {
 
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                GarminError::Database(format!("Failed to create directory: {}", e))
-            })?;
+            fs::create_dir_all(parent)
+                .map_err(|e| GarminError::Database(format!("Failed to create directory: {}", e)))?;
         }
 
         let file = File::create(&temp_path)
@@ -136,8 +137,9 @@ impl ParquetStore {
             .set_compression(Compression::ZSTD(Default::default()))
             .build();
 
-        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props))
-            .map_err(|e| GarminError::Database(format!("Failed to create Parquet writer: {}", e)))?;
+        let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props)).map_err(|e| {
+            GarminError::Database(format!("Failed to create Parquet writer: {}", e))
+        })?;
 
         writer
             .write(batch)
@@ -308,8 +310,14 @@ impl ParquetStore {
     fn activities_to_batch(activities: Vec<&Activity>) -> Result<RecordBatch> {
         let activity_id: Int64Array = activities.iter().map(|a| a.activity_id).collect();
         let profile_id: Int32Array = activities.iter().map(|a| a.profile_id).collect();
-        let activity_name: StringArray = activities.iter().map(|a| a.activity_name.as_deref()).collect();
-        let activity_type: StringArray = activities.iter().map(|a| a.activity_type.as_deref()).collect();
+        let activity_name: StringArray = activities
+            .iter()
+            .map(|a| a.activity_name.as_deref())
+            .collect();
+        let activity_type: StringArray = activities
+            .iter()
+            .map(|a| a.activity_type.as_deref())
+            .collect();
         let start_time_local: TimestampMicrosecondArray = activities
             .iter()
             .map(|a| a.start_time_local.map(|t| t.timestamp_micros()))
@@ -336,10 +344,15 @@ impl ParquetStore {
         let start_lon: Float64Array = activities.iter().map(|a| a.start_lon).collect();
         let end_lat: Float64Array = activities.iter().map(|a| a.end_lat).collect();
         let end_lon: Float64Array = activities.iter().map(|a| a.end_lon).collect();
-        let ground_contact_time: Float64Array = activities.iter().map(|a| a.ground_contact_time).collect();
-        let vertical_oscillation: Float64Array = activities.iter().map(|a| a.vertical_oscillation).collect();
+        let ground_contact_time: Float64Array =
+            activities.iter().map(|a| a.ground_contact_time).collect();
+        let vertical_oscillation: Float64Array =
+            activities.iter().map(|a| a.vertical_oscillation).collect();
         let stride_length: Float64Array = activities.iter().map(|a| a.stride_length).collect();
-        let location_name: StringArray = activities.iter().map(|a| a.location_name.as_deref()).collect();
+        let location_name: StringArray = activities
+            .iter()
+            .map(|a| a.location_name.as_deref())
+            .collect();
         let raw_json: StringArray = activities
             .iter()
             .map(|a| a.raw_json.as_ref().map(|j| j.to_string()))
@@ -350,8 +363,16 @@ impl ParquetStore {
             Field::new("profile_id", DataType::Int32, false),
             Field::new("activity_name", DataType::Utf8, true),
             Field::new("activity_type", DataType::Utf8, true),
-            Field::new("start_time_local", DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None), true),
-            Field::new("start_time_gmt", DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None), true),
+            Field::new(
+                "start_time_local",
+                DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
+                true,
+            ),
+            Field::new(
+                "start_time_gmt",
+                DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
+                true,
+            ),
             Field::new("duration_sec", DataType::Float64, true),
             Field::new("distance_m", DataType::Float64, true),
             Field::new("calories", DataType::Int32, true),
@@ -418,42 +439,162 @@ impl ParquetStore {
         let len = batch.num_rows();
         let mut activities = Vec::with_capacity(len);
 
-        let activity_id = batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
-        let profile_id = batch.column(1).as_any().downcast_ref::<Int32Array>().unwrap();
-        let activity_name = batch.column(2).as_any().downcast_ref::<StringArray>().unwrap();
-        let activity_type = batch.column(3).as_any().downcast_ref::<StringArray>().unwrap();
-        let start_time_local = batch.column(4).as_any().downcast_ref::<TimestampMicrosecondArray>().unwrap();
-        let start_time_gmt = batch.column(5).as_any().downcast_ref::<TimestampMicrosecondArray>().unwrap();
-        let duration_sec = batch.column(6).as_any().downcast_ref::<Float64Array>().unwrap();
-        let distance_m = batch.column(7).as_any().downcast_ref::<Float64Array>().unwrap();
-        let calories = batch.column(8).as_any().downcast_ref::<Int32Array>().unwrap();
-        let avg_hr = batch.column(9).as_any().downcast_ref::<Int32Array>().unwrap();
-        let max_hr = batch.column(10).as_any().downcast_ref::<Int32Array>().unwrap();
-        let avg_speed = batch.column(11).as_any().downcast_ref::<Float64Array>().unwrap();
-        let max_speed = batch.column(12).as_any().downcast_ref::<Float64Array>().unwrap();
-        let elevation_gain = batch.column(13).as_any().downcast_ref::<Float64Array>().unwrap();
-        let elevation_loss = batch.column(14).as_any().downcast_ref::<Float64Array>().unwrap();
-        let avg_cadence = batch.column(15).as_any().downcast_ref::<Float64Array>().unwrap();
-        let avg_power = batch.column(16).as_any().downcast_ref::<Int32Array>().unwrap();
-        let normalized_power = batch.column(17).as_any().downcast_ref::<Int32Array>().unwrap();
-        let training_effect = batch.column(18).as_any().downcast_ref::<Float64Array>().unwrap();
-        let training_load = batch.column(19).as_any().downcast_ref::<Float64Array>().unwrap();
-        let start_lat = batch.column(20).as_any().downcast_ref::<Float64Array>().unwrap();
-        let start_lon = batch.column(21).as_any().downcast_ref::<Float64Array>().unwrap();
-        let end_lat = batch.column(22).as_any().downcast_ref::<Float64Array>().unwrap();
-        let end_lon = batch.column(23).as_any().downcast_ref::<Float64Array>().unwrap();
-        let ground_contact_time = batch.column(24).as_any().downcast_ref::<Float64Array>().unwrap();
-        let vertical_oscillation = batch.column(25).as_any().downcast_ref::<Float64Array>().unwrap();
-        let stride_length = batch.column(26).as_any().downcast_ref::<Float64Array>().unwrap();
-        let location_name = batch.column(27).as_any().downcast_ref::<StringArray>().unwrap();
-        let raw_json = batch.column(28).as_any().downcast_ref::<StringArray>().unwrap();
+        let activity_id = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let profile_id = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let activity_name = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let activity_type = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let start_time_local = batch
+            .column(4)
+            .as_any()
+            .downcast_ref::<TimestampMicrosecondArray>()
+            .unwrap();
+        let start_time_gmt = batch
+            .column(5)
+            .as_any()
+            .downcast_ref::<TimestampMicrosecondArray>()
+            .unwrap();
+        let duration_sec = batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let distance_m = batch
+            .column(7)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let calories = batch
+            .column(8)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let avg_hr = batch
+            .column(9)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let max_hr = batch
+            .column(10)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let avg_speed = batch
+            .column(11)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let max_speed = batch
+            .column(12)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let elevation_gain = batch
+            .column(13)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let elevation_loss = batch
+            .column(14)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let avg_cadence = batch
+            .column(15)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let avg_power = batch
+            .column(16)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let normalized_power = batch
+            .column(17)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let training_effect = batch
+            .column(18)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let training_load = batch
+            .column(19)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let start_lat = batch
+            .column(20)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let start_lon = batch
+            .column(21)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let end_lat = batch
+            .column(22)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let end_lon = batch
+            .column(23)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let ground_contact_time = batch
+            .column(24)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let vertical_oscillation = batch
+            .column(25)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let stride_length = batch
+            .column(26)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let location_name = batch
+            .column(27)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let raw_json = batch
+            .column(28)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
 
         for i in 0..len {
             activities.push(Activity {
                 activity_id: activity_id.value(i),
                 profile_id: profile_id.value(i),
-                activity_name: activity_name.is_valid(i).then(|| activity_name.value(i).to_string()),
-                activity_type: activity_type.is_valid(i).then(|| activity_type.value(i).to_string()),
+                activity_name: activity_name
+                    .is_valid(i)
+                    .then(|| activity_name.value(i).to_string()),
+                activity_type: activity_type
+                    .is_valid(i)
+                    .then(|| activity_type.value(i).to_string()),
                 start_time_local: start_time_local.is_valid(i).then(|| {
                     DateTime::from_timestamp_micros(start_time_local.value(i)).unwrap_or_default()
                 }),
@@ -471,20 +612,30 @@ impl ParquetStore {
                 elevation_loss: elevation_loss.is_valid(i).then(|| elevation_loss.value(i)),
                 avg_cadence: avg_cadence.is_valid(i).then(|| avg_cadence.value(i)),
                 avg_power: avg_power.is_valid(i).then(|| avg_power.value(i)),
-                normalized_power: normalized_power.is_valid(i).then(|| normalized_power.value(i)),
-                training_effect: training_effect.is_valid(i).then(|| training_effect.value(i)),
+                normalized_power: normalized_power
+                    .is_valid(i)
+                    .then(|| normalized_power.value(i)),
+                training_effect: training_effect
+                    .is_valid(i)
+                    .then(|| training_effect.value(i)),
                 training_load: training_load.is_valid(i).then(|| training_load.value(i)),
                 start_lat: start_lat.is_valid(i).then(|| start_lat.value(i)),
                 start_lon: start_lon.is_valid(i).then(|| start_lon.value(i)),
                 end_lat: end_lat.is_valid(i).then(|| end_lat.value(i)),
                 end_lon: end_lon.is_valid(i).then(|| end_lon.value(i)),
-                ground_contact_time: ground_contact_time.is_valid(i).then(|| ground_contact_time.value(i)),
-                vertical_oscillation: vertical_oscillation.is_valid(i).then(|| vertical_oscillation.value(i)),
+                ground_contact_time: ground_contact_time
+                    .is_valid(i)
+                    .then(|| ground_contact_time.value(i)),
+                vertical_oscillation: vertical_oscillation
+                    .is_valid(i)
+                    .then(|| vertical_oscillation.value(i)),
                 stride_length: stride_length.is_valid(i).then(|| stride_length.value(i)),
-                location_name: location_name.is_valid(i).then(|| location_name.value(i).to_string()),
-                raw_json: raw_json.is_valid(i).then(|| {
-                    serde_json::from_str(raw_json.value(i)).unwrap_or_default()
-                }),
+                location_name: location_name
+                    .is_valid(i)
+                    .then(|| location_name.value(i).to_string()),
+                raw_json: raw_json
+                    .is_valid(i)
+                    .then(|| serde_json::from_str(raw_json.value(i)).unwrap_or_default()),
             });
         }
 
@@ -516,10 +667,8 @@ impl ParquetStore {
             let mut existing = self.read_daily_health_from_path(&path)?;
 
             // Create set of new dates for fast lookup
-            let new_dates: std::collections::HashSet<(i32, NaiveDate)> = new_records
-                .iter()
-                .map(|r| (r.profile_id, r.date))
-                .collect();
+            let new_dates: std::collections::HashSet<(i32, NaiveDate)> =
+                new_records.iter().map(|r| (r.profile_id, r.date)).collect();
 
             // Keep existing records that aren't being replaced
             existing.retain(|r| !new_dates.contains(&(r.profile_id, r.date)));
@@ -564,10 +713,8 @@ impl ParquetStore {
             let mut existing = self.read_daily_health_from_path(&path)?;
 
             // Create set of new dates for fast lookup
-            let new_dates: std::collections::HashSet<(i32, NaiveDate)> = new_records
-                .iter()
-                .map(|r| (r.profile_id, r.date))
-                .collect();
+            let new_dates: std::collections::HashSet<(i32, NaiveDate)> =
+                new_records.iter().map(|r| (r.profile_id, r.date)).collect();
 
             // Keep existing records that aren't being replaced
             existing.retain(|r| !new_dates.contains(&(r.profile_id, r.date)));
@@ -616,7 +763,8 @@ impl ParquetStore {
         let resting_hr: Int32Array = records.iter().map(|r| r.resting_hr).collect();
         let sleep_seconds: Int32Array = records.iter().map(|r| r.sleep_seconds).collect();
         let deep_sleep_seconds: Int32Array = records.iter().map(|r| r.deep_sleep_seconds).collect();
-        let light_sleep_seconds: Int32Array = records.iter().map(|r| r.light_sleep_seconds).collect();
+        let light_sleep_seconds: Int32Array =
+            records.iter().map(|r| r.light_sleep_seconds).collect();
         let rem_sleep_seconds: Int32Array = records.iter().map(|r| r.rem_sleep_seconds).collect();
         let sleep_score: Int32Array = records.iter().map(|r| r.sleep_score).collect();
         let avg_stress: Int32Array = records.iter().map(|r| r.avg_stress).collect();
@@ -630,8 +778,10 @@ impl ParquetStore {
         let avg_spo2: Int32Array = records.iter().map(|r| r.avg_spo2).collect();
         let lowest_spo2: Int32Array = records.iter().map(|r| r.lowest_spo2).collect();
         let hydration_ml: Int32Array = records.iter().map(|r| r.hydration_ml).collect();
-        let moderate_intensity_min: Int32Array = records.iter().map(|r| r.moderate_intensity_min).collect();
-        let vigorous_intensity_min: Int32Array = records.iter().map(|r| r.vigorous_intensity_min).collect();
+        let moderate_intensity_min: Int32Array =
+            records.iter().map(|r| r.moderate_intensity_min).collect();
+        let vigorous_intensity_min: Int32Array =
+            records.iter().map(|r| r.vigorous_intensity_min).collect();
         let raw_json: StringArray = records
             .iter()
             .map(|r| r.raw_json.as_ref().map(|j| j.to_string()))
@@ -708,34 +858,146 @@ impl ParquetStore {
         let len = batch.num_rows();
         let mut records = Vec::with_capacity(len);
 
-        let id = batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
-        let profile_id = batch.column(1).as_any().downcast_ref::<Int32Array>().unwrap();
-        let date = batch.column(2).as_any().downcast_ref::<Date32Array>().unwrap();
-        let steps = batch.column(3).as_any().downcast_ref::<Int32Array>().unwrap();
-        let step_goal = batch.column(4).as_any().downcast_ref::<Int32Array>().unwrap();
-        let total_calories = batch.column(5).as_any().downcast_ref::<Int32Array>().unwrap();
-        let active_calories = batch.column(6).as_any().downcast_ref::<Int32Array>().unwrap();
-        let bmr_calories = batch.column(7).as_any().downcast_ref::<Int32Array>().unwrap();
-        let resting_hr = batch.column(8).as_any().downcast_ref::<Int32Array>().unwrap();
-        let sleep_seconds = batch.column(9).as_any().downcast_ref::<Int32Array>().unwrap();
-        let deep_sleep_seconds = batch.column(10).as_any().downcast_ref::<Int32Array>().unwrap();
-        let light_sleep_seconds = batch.column(11).as_any().downcast_ref::<Int32Array>().unwrap();
-        let rem_sleep_seconds = batch.column(12).as_any().downcast_ref::<Int32Array>().unwrap();
-        let sleep_score = batch.column(13).as_any().downcast_ref::<Int32Array>().unwrap();
-        let avg_stress = batch.column(14).as_any().downcast_ref::<Int32Array>().unwrap();
-        let max_stress = batch.column(15).as_any().downcast_ref::<Int32Array>().unwrap();
-        let body_battery_start = batch.column(16).as_any().downcast_ref::<Int32Array>().unwrap();
-        let body_battery_end = batch.column(17).as_any().downcast_ref::<Int32Array>().unwrap();
-        let hrv_weekly_avg = batch.column(18).as_any().downcast_ref::<Int32Array>().unwrap();
-        let hrv_last_night = batch.column(19).as_any().downcast_ref::<Int32Array>().unwrap();
-        let hrv_status = batch.column(20).as_any().downcast_ref::<StringArray>().unwrap();
-        let avg_respiration = batch.column(21).as_any().downcast_ref::<Float64Array>().unwrap();
-        let avg_spo2 = batch.column(22).as_any().downcast_ref::<Int32Array>().unwrap();
-        let lowest_spo2 = batch.column(23).as_any().downcast_ref::<Int32Array>().unwrap();
-        let hydration_ml = batch.column(24).as_any().downcast_ref::<Int32Array>().unwrap();
-        let moderate_intensity_min = batch.column(25).as_any().downcast_ref::<Int32Array>().unwrap();
-        let vigorous_intensity_min = batch.column(26).as_any().downcast_ref::<Int32Array>().unwrap();
-        let raw_json = batch.column(27).as_any().downcast_ref::<StringArray>().unwrap();
+        let id = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let profile_id = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let date = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<Date32Array>()
+            .unwrap();
+        let steps = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let step_goal = batch
+            .column(4)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let total_calories = batch
+            .column(5)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let active_calories = batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let bmr_calories = batch
+            .column(7)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let resting_hr = batch
+            .column(8)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let sleep_seconds = batch
+            .column(9)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let deep_sleep_seconds = batch
+            .column(10)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let light_sleep_seconds = batch
+            .column(11)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let rem_sleep_seconds = batch
+            .column(12)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let sleep_score = batch
+            .column(13)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let avg_stress = batch
+            .column(14)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let max_stress = batch
+            .column(15)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let body_battery_start = batch
+            .column(16)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let body_battery_end = batch
+            .column(17)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let hrv_weekly_avg = batch
+            .column(18)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let hrv_last_night = batch
+            .column(19)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let hrv_status = batch
+            .column(20)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let avg_respiration = batch
+            .column(21)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let avg_spo2 = batch
+            .column(22)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let lowest_spo2 = batch
+            .column(23)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let hydration_ml = batch
+            .column(24)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let moderate_intensity_min = batch
+            .column(25)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let vigorous_intensity_min = batch
+            .column(26)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let raw_json = batch
+            .column(27)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
 
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
@@ -747,30 +1009,50 @@ impl ParquetStore {
                 steps: steps.is_valid(i).then(|| steps.value(i)),
                 step_goal: step_goal.is_valid(i).then(|| step_goal.value(i)),
                 total_calories: total_calories.is_valid(i).then(|| total_calories.value(i)),
-                active_calories: active_calories.is_valid(i).then(|| active_calories.value(i)),
+                active_calories: active_calories
+                    .is_valid(i)
+                    .then(|| active_calories.value(i)),
                 bmr_calories: bmr_calories.is_valid(i).then(|| bmr_calories.value(i)),
                 resting_hr: resting_hr.is_valid(i).then(|| resting_hr.value(i)),
                 sleep_seconds: sleep_seconds.is_valid(i).then(|| sleep_seconds.value(i)),
-                deep_sleep_seconds: deep_sleep_seconds.is_valid(i).then(|| deep_sleep_seconds.value(i)),
-                light_sleep_seconds: light_sleep_seconds.is_valid(i).then(|| light_sleep_seconds.value(i)),
-                rem_sleep_seconds: rem_sleep_seconds.is_valid(i).then(|| rem_sleep_seconds.value(i)),
+                deep_sleep_seconds: deep_sleep_seconds
+                    .is_valid(i)
+                    .then(|| deep_sleep_seconds.value(i)),
+                light_sleep_seconds: light_sleep_seconds
+                    .is_valid(i)
+                    .then(|| light_sleep_seconds.value(i)),
+                rem_sleep_seconds: rem_sleep_seconds
+                    .is_valid(i)
+                    .then(|| rem_sleep_seconds.value(i)),
                 sleep_score: sleep_score.is_valid(i).then(|| sleep_score.value(i)),
                 avg_stress: avg_stress.is_valid(i).then(|| avg_stress.value(i)),
                 max_stress: max_stress.is_valid(i).then(|| max_stress.value(i)),
-                body_battery_start: body_battery_start.is_valid(i).then(|| body_battery_start.value(i)),
-                body_battery_end: body_battery_end.is_valid(i).then(|| body_battery_end.value(i)),
+                body_battery_start: body_battery_start
+                    .is_valid(i)
+                    .then(|| body_battery_start.value(i)),
+                body_battery_end: body_battery_end
+                    .is_valid(i)
+                    .then(|| body_battery_end.value(i)),
                 hrv_weekly_avg: hrv_weekly_avg.is_valid(i).then(|| hrv_weekly_avg.value(i)),
                 hrv_last_night: hrv_last_night.is_valid(i).then(|| hrv_last_night.value(i)),
-                hrv_status: hrv_status.is_valid(i).then(|| hrv_status.value(i).to_string()),
-                avg_respiration: avg_respiration.is_valid(i).then(|| avg_respiration.value(i)),
+                hrv_status: hrv_status
+                    .is_valid(i)
+                    .then(|| hrv_status.value(i).to_string()),
+                avg_respiration: avg_respiration
+                    .is_valid(i)
+                    .then(|| avg_respiration.value(i)),
                 avg_spo2: avg_spo2.is_valid(i).then(|| avg_spo2.value(i)),
                 lowest_spo2: lowest_spo2.is_valid(i).then(|| lowest_spo2.value(i)),
                 hydration_ml: hydration_ml.is_valid(i).then(|| hydration_ml.value(i)),
-                moderate_intensity_min: moderate_intensity_min.is_valid(i).then(|| moderate_intensity_min.value(i)),
-                vigorous_intensity_min: vigorous_intensity_min.is_valid(i).then(|| vigorous_intensity_min.value(i)),
-                raw_json: raw_json.is_valid(i).then(|| {
-                    serde_json::from_str(raw_json.value(i)).unwrap_or_default()
-                }),
+                moderate_intensity_min: moderate_intensity_min
+                    .is_valid(i)
+                    .then(|| moderate_intensity_min.value(i)),
+                vigorous_intensity_min: vigorous_intensity_min
+                    .is_valid(i)
+                    .then(|| vigorous_intensity_min.value(i)),
+                raw_json: raw_json
+                    .is_valid(i)
+                    .then(|| serde_json::from_str(raw_json.value(i)).unwrap_or_default()),
             });
         }
 
@@ -782,7 +1064,11 @@ impl ParquetStore {
     // =========================================================================
 
     /// Write track points for an activity
-    pub fn write_track_points(&self, activity_date: NaiveDate, points: &[TrackPoint]) -> Result<()> {
+    pub fn write_track_points(
+        &self,
+        activity_date: NaiveDate,
+        points: &[TrackPoint],
+    ) -> Result<()> {
         self.ensure_dir(EntityType::TrackPoints)?;
 
         let key = EntityType::TrackPoints.partition_key(activity_date);
@@ -879,7 +1165,11 @@ impl ParquetStore {
         let schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, true),
             Field::new("activity_id", DataType::Int64, false),
-            Field::new("timestamp", DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None), false),
+            Field::new(
+                "timestamp",
+                DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
+                false,
+            ),
             Field::new("lat", DataType::Float64, true),
             Field::new("lon", DataType::Float64, true),
             Field::new("elevation", DataType::Float64, true),
@@ -911,16 +1201,56 @@ impl ParquetStore {
         let len = batch.num_rows();
         let mut points = Vec::with_capacity(len);
 
-        let id = batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
-        let activity_id = batch.column(1).as_any().downcast_ref::<Int64Array>().unwrap();
-        let timestamp = batch.column(2).as_any().downcast_ref::<TimestampMicrosecondArray>().unwrap();
-        let lat = batch.column(3).as_any().downcast_ref::<Float64Array>().unwrap();
-        let lon = batch.column(4).as_any().downcast_ref::<Float64Array>().unwrap();
-        let elevation = batch.column(5).as_any().downcast_ref::<Float64Array>().unwrap();
-        let heart_rate = batch.column(6).as_any().downcast_ref::<Int32Array>().unwrap();
-        let cadence = batch.column(7).as_any().downcast_ref::<Int32Array>().unwrap();
-        let power = batch.column(8).as_any().downcast_ref::<Int32Array>().unwrap();
-        let speed = batch.column(9).as_any().downcast_ref::<Float64Array>().unwrap();
+        let id = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let activity_id = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let timestamp = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<TimestampMicrosecondArray>()
+            .unwrap();
+        let lat = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let lon = batch
+            .column(4)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let elevation = batch
+            .column(5)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let heart_rate = batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let cadence = batch
+            .column(7)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let power = batch
+            .column(8)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let speed = batch
+            .column(9)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
 
         for i in 0..len {
             points.push(TrackPoint {
@@ -965,10 +1295,8 @@ impl ParquetStore {
             let mut existing = self.read_performance_metrics_from_path(&path)?;
 
             // Create set of new dates for fast lookup
-            let new_dates: std::collections::HashSet<(i32, NaiveDate)> = new_records
-                .iter()
-                .map(|r| (r.profile_id, r.date))
-                .collect();
+            let new_dates: std::collections::HashSet<(i32, NaiveDate)> =
+                new_records.iter().map(|r| (r.profile_id, r.date)).collect();
 
             // Keep existing records that aren't being replaced
             existing.retain(|r| !new_dates.contains(&(r.profile_id, r.date)));
@@ -989,7 +1317,10 @@ impl ParquetStore {
     }
 
     /// Upsert performance metrics records with partition-level locking for concurrent writes
-    pub async fn upsert_performance_metrics_async(&self, records: &[PerformanceMetrics]) -> Result<()> {
+    pub async fn upsert_performance_metrics_async(
+        &self,
+        records: &[PerformanceMetrics],
+    ) -> Result<()> {
         self.ensure_dir(EntityType::PerformanceMetrics)?;
 
         // Group by partition key
@@ -1013,10 +1344,8 @@ impl ParquetStore {
             let mut existing = self.read_performance_metrics_from_path(&path)?;
 
             // Create set of new dates for fast lookup
-            let new_dates: std::collections::HashSet<(i32, NaiveDate)> = new_records
-                .iter()
-                .map(|r| (r.profile_id, r.date))
-                .collect();
+            let new_dates: std::collections::HashSet<(i32, NaiveDate)> =
+                new_records.iter().map(|r| (r.profile_id, r.date)).collect();
 
             // Keep existing records that aren't being replaced
             existing.retain(|r| !new_dates.contains(&(r.profile_id, r.date)));
@@ -1060,9 +1389,14 @@ impl ParquetStore {
         let vo2max: Float64Array = records.iter().map(|r| r.vo2max).collect();
         let fitness_age: Int32Array = records.iter().map(|r| r.fitness_age).collect();
         let training_readiness: Int32Array = records.iter().map(|r| r.training_readiness).collect();
-        let training_status: StringArray = records.iter().map(|r| r.training_status.as_deref()).collect();
-        let lactate_threshold_hr: Int32Array = records.iter().map(|r| r.lactate_threshold_hr).collect();
-        let lactate_threshold_pace: Float64Array = records.iter().map(|r| r.lactate_threshold_pace).collect();
+        let training_status: StringArray = records
+            .iter()
+            .map(|r| r.training_status.as_deref())
+            .collect();
+        let lactate_threshold_hr: Int32Array =
+            records.iter().map(|r| r.lactate_threshold_hr).collect();
+        let lactate_threshold_pace: Float64Array =
+            records.iter().map(|r| r.lactate_threshold_pace).collect();
         let race_5k_sec: Int32Array = records.iter().map(|r| r.race_5k_sec).collect();
         let race_10k_sec: Int32Array = records.iter().map(|r| r.race_10k_sec).collect();
         let race_half_sec: Int32Array = records.iter().map(|r| r.race_half_sec).collect();
@@ -1121,22 +1455,86 @@ impl ParquetStore {
         let len = batch.num_rows();
         let mut records = Vec::with_capacity(len);
 
-        let id = batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
-        let profile_id = batch.column(1).as_any().downcast_ref::<Int32Array>().unwrap();
-        let date = batch.column(2).as_any().downcast_ref::<Date32Array>().unwrap();
-        let vo2max = batch.column(3).as_any().downcast_ref::<Float64Array>().unwrap();
-        let fitness_age = batch.column(4).as_any().downcast_ref::<Int32Array>().unwrap();
-        let training_readiness = batch.column(5).as_any().downcast_ref::<Int32Array>().unwrap();
-        let training_status = batch.column(6).as_any().downcast_ref::<StringArray>().unwrap();
-        let lactate_threshold_hr = batch.column(7).as_any().downcast_ref::<Int32Array>().unwrap();
-        let lactate_threshold_pace = batch.column(8).as_any().downcast_ref::<Float64Array>().unwrap();
-        let race_5k_sec = batch.column(9).as_any().downcast_ref::<Int32Array>().unwrap();
-        let race_10k_sec = batch.column(10).as_any().downcast_ref::<Int32Array>().unwrap();
-        let race_half_sec = batch.column(11).as_any().downcast_ref::<Int32Array>().unwrap();
-        let race_marathon_sec = batch.column(12).as_any().downcast_ref::<Int32Array>().unwrap();
-        let endurance_score = batch.column(13).as_any().downcast_ref::<Int32Array>().unwrap();
-        let hill_score = batch.column(14).as_any().downcast_ref::<Int32Array>().unwrap();
-        let raw_json = batch.column(15).as_any().downcast_ref::<StringArray>().unwrap();
+        let id = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let profile_id = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let date = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<Date32Array>()
+            .unwrap();
+        let vo2max = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let fitness_age = batch
+            .column(4)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let training_readiness = batch
+            .column(5)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let training_status = batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let lactate_threshold_hr = batch
+            .column(7)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let lactate_threshold_pace = batch
+            .column(8)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let race_5k_sec = batch
+            .column(9)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let race_10k_sec = batch
+            .column(10)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let race_half_sec = batch
+            .column(11)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let race_marathon_sec = batch
+            .column(12)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let endurance_score = batch
+            .column(13)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let hill_score = batch
+            .column(14)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let raw_json = batch
+            .column(15)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
 
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
@@ -1147,19 +1545,31 @@ impl ParquetStore {
                 date: epoch + chrono::Duration::days(date.value(i) as i64),
                 vo2max: vo2max.is_valid(i).then(|| vo2max.value(i)),
                 fitness_age: fitness_age.is_valid(i).then(|| fitness_age.value(i)),
-                training_readiness: training_readiness.is_valid(i).then(|| training_readiness.value(i)),
-                training_status: training_status.is_valid(i).then(|| training_status.value(i).to_string()),
-                lactate_threshold_hr: lactate_threshold_hr.is_valid(i).then(|| lactate_threshold_hr.value(i)),
-                lactate_threshold_pace: lactate_threshold_pace.is_valid(i).then(|| lactate_threshold_pace.value(i)),
+                training_readiness: training_readiness
+                    .is_valid(i)
+                    .then(|| training_readiness.value(i)),
+                training_status: training_status
+                    .is_valid(i)
+                    .then(|| training_status.value(i).to_string()),
+                lactate_threshold_hr: lactate_threshold_hr
+                    .is_valid(i)
+                    .then(|| lactate_threshold_hr.value(i)),
+                lactate_threshold_pace: lactate_threshold_pace
+                    .is_valid(i)
+                    .then(|| lactate_threshold_pace.value(i)),
                 race_5k_sec: race_5k_sec.is_valid(i).then(|| race_5k_sec.value(i)),
                 race_10k_sec: race_10k_sec.is_valid(i).then(|| race_10k_sec.value(i)),
                 race_half_sec: race_half_sec.is_valid(i).then(|| race_half_sec.value(i)),
-                race_marathon_sec: race_marathon_sec.is_valid(i).then(|| race_marathon_sec.value(i)),
-                endurance_score: endurance_score.is_valid(i).then(|| endurance_score.value(i)),
+                race_marathon_sec: race_marathon_sec
+                    .is_valid(i)
+                    .then(|| race_marathon_sec.value(i)),
+                endurance_score: endurance_score
+                    .is_valid(i)
+                    .then(|| endurance_score.value(i)),
                 hill_score: hill_score.is_valid(i).then(|| hill_score.value(i)),
-                raw_json: raw_json.is_valid(i).then(|| {
-                    serde_json::from_str(raw_json.value(i)).unwrap_or_default()
-                }),
+                raw_json: raw_json
+                    .is_valid(i)
+                    .then(|| serde_json::from_str(raw_json.value(i)).unwrap_or_default()),
             });
         }
 
@@ -1191,10 +1601,8 @@ impl ParquetStore {
             let mut existing = self.read_weight_from_path(&path)?;
 
             // Create set of new dates for fast lookup
-            let new_dates: std::collections::HashSet<(i32, NaiveDate)> = new_records
-                .iter()
-                .map(|r| (r.profile_id, r.date))
-                .collect();
+            let new_dates: std::collections::HashSet<(i32, NaiveDate)> =
+                new_records.iter().map(|r| (r.profile_id, r.date)).collect();
 
             // Keep existing records that aren't being replaced
             existing.retain(|r| !new_dates.contains(&(r.profile_id, r.date)));
@@ -1269,13 +1677,41 @@ impl ParquetStore {
         let len = batch.num_rows();
         let mut records = Vec::with_capacity(len);
 
-        let id = batch.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
-        let profile_id = batch.column(1).as_any().downcast_ref::<Int32Array>().unwrap();
-        let date = batch.column(2).as_any().downcast_ref::<Date32Array>().unwrap();
-        let weight_kg = batch.column(3).as_any().downcast_ref::<Float64Array>().unwrap();
-        let bmi = batch.column(4).as_any().downcast_ref::<Float64Array>().unwrap();
-        let body_fat_pct = batch.column(5).as_any().downcast_ref::<Float64Array>().unwrap();
-        let muscle_mass_kg = batch.column(6).as_any().downcast_ref::<Float64Array>().unwrap();
+        let id = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let profile_id = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let date = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<Date32Array>()
+            .unwrap();
+        let weight_kg = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let bmi = batch
+            .column(4)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let body_fat_pct = batch
+            .column(5)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
+        let muscle_mass_kg = batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .unwrap();
 
         let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
 
@@ -1300,9 +1736,8 @@ impl ParquetStore {
 
     /// Write profiles (overwrites entire file)
     pub fn write_profiles(&self, profiles: &[Profile]) -> Result<()> {
-        fs::create_dir_all(&self.base_path).map_err(|e| {
-            GarminError::Database(format!("Failed to create directory: {}", e))
-        })?;
+        fs::create_dir_all(&self.base_path)
+            .map_err(|e| GarminError::Database(format!("Failed to create directory: {}", e)))?;
 
         let path = self.partition_path(EntityType::Profiles, "");
         let refs: Vec<&Profile> = profiles.iter().collect();
@@ -1327,7 +1762,10 @@ impl ParquetStore {
 
     fn profiles_to_batch(profiles: Vec<&Profile>) -> Result<RecordBatch> {
         let profile_id: Int32Array = profiles.iter().map(|p| p.profile_id).collect();
-        let display_name: StringArray = profiles.iter().map(|p| Some(p.display_name.as_str())).collect();
+        let display_name: StringArray = profiles
+            .iter()
+            .map(|p| Some(p.display_name.as_str()))
+            .collect();
         let user_id: Int64Array = profiles.iter().map(|p| p.user_id).collect();
         let created_at: TimestampMicrosecondArray = profiles
             .iter()
@@ -1342,8 +1780,16 @@ impl ParquetStore {
             Field::new("profile_id", DataType::Int32, false),
             Field::new("display_name", DataType::Utf8, false),
             Field::new("user_id", DataType::Int64, true),
-            Field::new("created_at", DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None), true),
-            Field::new("last_sync_at", DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None), true),
+            Field::new(
+                "created_at",
+                DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
+                true,
+            ),
+            Field::new(
+                "last_sync_at",
+                DataType::Timestamp(arrow::datatypes::TimeUnit::Microsecond, None),
+                true,
+            ),
         ]));
 
         RecordBatch::try_new(
@@ -1363,11 +1809,31 @@ impl ParquetStore {
         let len = batch.num_rows();
         let mut profiles = Vec::with_capacity(len);
 
-        let profile_id = batch.column(0).as_any().downcast_ref::<Int32Array>().unwrap();
-        let display_name = batch.column(1).as_any().downcast_ref::<StringArray>().unwrap();
-        let user_id = batch.column(2).as_any().downcast_ref::<Int64Array>().unwrap();
-        let created_at = batch.column(3).as_any().downcast_ref::<TimestampMicrosecondArray>().unwrap();
-        let last_sync_at = batch.column(4).as_any().downcast_ref::<TimestampMicrosecondArray>().unwrap();
+        let profile_id = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .unwrap();
+        let display_name = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let user_id = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        let created_at = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<TimestampMicrosecondArray>()
+            .unwrap();
+        let last_sync_at = batch
+            .column(4)
+            .as_any()
+            .downcast_ref::<TimestampMicrosecondArray>()
+            .unwrap();
 
         for i in 0..len {
             profiles.push(Profile {
@@ -1437,9 +1903,8 @@ mod tests {
         store.upsert_activities(&activities).unwrap();
 
         // Read back
-        let key = EntityType::Activities.partition_key(
-            activities[0].start_time_local.unwrap().date_naive()
-        );
+        let key = EntityType::Activities
+            .partition_key(activities[0].start_time_local.unwrap().date_naive());
         let path = store.partition_path(EntityType::Activities, &key);
         let read_back = store.read_activities_from_path(&path).unwrap();
 
@@ -1493,7 +1958,10 @@ mod tests {
 
         assert_eq!(read_back.len(), 1);
         assert_eq!(read_back[0].steps, Some(10000));
-        assert_eq!(read_back[0].date, NaiveDate::from_ymd_opt(2024, 12, 15).unwrap());
+        assert_eq!(
+            read_back[0].date,
+            NaiveDate::from_ymd_opt(2024, 12, 15).unwrap()
+        );
     }
 
     #[test]
@@ -1616,9 +2084,8 @@ mod tests {
             barrier_reader.wait(); // Sync with writer
 
             // Read the existing file
-            let key = EntityType::Activities.partition_key(
-                NaiveDate::from_ymd_opt(2023, 12, 19).unwrap()
-            );
+            let key = EntityType::Activities
+                .partition_key(NaiveDate::from_ymd_opt(2023, 12, 19).unwrap());
             let path = store_reader.partition_path(EntityType::Activities, &key);
             let activities = store_reader.read_activities_from_path(&path).unwrap();
 
@@ -1753,10 +2220,12 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         let glob_pattern = format!("{}/*.parquet", temp.path().join("activities").display());
 
-        let mut stmt = conn.prepare(&format!(
-            "SELECT activity_id, activity_name FROM '{}' ORDER BY activity_id",
-            glob_pattern
-        )).unwrap();
+        let mut stmt = conn
+            .prepare(&format!(
+                "SELECT activity_id, activity_name FROM '{}' ORDER BY activity_id",
+                glob_pattern
+            ))
+            .unwrap();
 
         let results: Vec<(i64, String)> = stmt
             .query_map([], |row| {

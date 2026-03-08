@@ -30,8 +30,9 @@ impl SyncDb {
 
     /// Open an in-memory database (for testing)
     pub fn open_in_memory() -> Result<Self> {
-        let conn = Connection::open_in_memory()
-            .map_err(|e| GarminError::Database(format!("Failed to open in-memory database: {}", e)))?;
+        let conn = Connection::open_in_memory().map_err(|e| {
+            GarminError::Database(format!("Failed to open in-memory database: {}", e))
+        })?;
 
         let db = Self { conn };
         db.migrate()?;
@@ -110,7 +111,9 @@ impl SyncDb {
                  ON sync_tasks(pipeline, status, next_retry_at)",
                 [],
             )
-            .map_err(|e| GarminError::Database(format!("Failed to create pipeline index: {}", e)))?;
+            .map_err(|e| {
+                GarminError::Database(format!("Failed to create pipeline index: {}", e))
+            })?;
 
         Ok(())
     }
@@ -231,7 +234,9 @@ impl SyncDb {
 
     /// Update sync state
     pub fn update_sync_state(&self, state: &SyncState) -> Result<()> {
-        let date_str = state.last_sync_date.map(|d| d.format("%Y-%m-%d").to_string());
+        let date_str = state
+            .last_sync_date
+            .map(|d| d.format("%Y-%m-%d").to_string());
 
         self.conn
             .execute(
@@ -240,7 +245,12 @@ impl SyncDb {
                  ON CONFLICT (profile_id, data_type) DO UPDATE SET
                      last_sync_date = excluded.last_sync_date,
                      last_activity_id = excluded.last_activity_id",
-                params![state.profile_id, state.data_type, date_str, state.last_activity_id],
+                params![
+                    state.profile_id,
+                    state.data_type,
+                    date_str,
+                    state.last_activity_id
+                ],
             )
             .map_err(|e| GarminError::Database(format!("Failed to update sync state: {}", e)))?;
 
@@ -323,7 +333,9 @@ impl SyncDb {
                  WHERE profile_id = ? AND data_type = ?",
                 params![frontier_str, profile_id, data_type],
             )
-            .map_err(|e| GarminError::Database(format!("Failed to update backfill frontier: {}", e)))?;
+            .map_err(|e| {
+                GarminError::Database(format!("Failed to update backfill frontier: {}", e))
+            })?;
 
         Ok(())
     }
@@ -337,7 +349,9 @@ impl SyncDb {
                  WHERE profile_id = ? AND data_type = ?",
                 params![profile_id, data_type],
             )
-            .map_err(|e| GarminError::Database(format!("Failed to mark backfill complete: {}", e)))?;
+            .map_err(|e| {
+                GarminError::Database(format!("Failed to mark backfill complete: {}", e))
+            })?;
 
         Ok(())
     }
@@ -384,7 +398,11 @@ impl SyncDb {
     }
 
     /// Pop the next task from the queue for a profile
-    pub fn pop_task(&self, profile_id: i32, pipeline: Option<SyncPipeline>) -> Result<Option<SyncTask>> {
+    pub fn pop_task(
+        &self,
+        profile_id: i32,
+        pipeline: Option<SyncPipeline>,
+    ) -> Result<Option<SyncTask>> {
         let (query, params) = if let Some(pipeline) = pipeline {
             (
                 "SELECT id, profile_id, task_type, task_data, pipeline, status, attempts, last_error,
@@ -576,7 +594,11 @@ impl SyncDb {
     }
 
     /// Count pending tasks
-    pub fn count_pending_tasks(&self, profile_id: i32, pipeline: Option<SyncPipeline>) -> Result<u32> {
+    pub fn count_pending_tasks(
+        &self,
+        profile_id: i32,
+        pipeline: Option<SyncPipeline>,
+    ) -> Result<u32> {
         let (query, params) = if let Some(pipeline) = pipeline {
             (
                 "SELECT COUNT(*) FROM sync_tasks
@@ -600,9 +622,7 @@ impl SyncDb {
     pub fn count_tasks_by_status(&self, profile_id: i32) -> Result<(u32, u32, u32, u32)> {
         let mut stmt = self
             .conn
-            .prepare(
-                "SELECT status, COUNT(*) FROM sync_tasks WHERE profile_id = ? GROUP BY status",
-            )
+            .prepare("SELECT status, COUNT(*) FROM sync_tasks WHERE profile_id = ? GROUP BY status")
             .map_err(|e| GarminError::Database(format!("Failed to prepare query: {}", e)))?;
 
         let mut pending = 0u32;
@@ -665,7 +685,9 @@ impl SyncDb {
         let mut performance = 0u32;
 
         let rows = stmt
-            .query_map(params, |row| Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?)))
+            .query_map(params, |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, u32>(1)?))
+            })
             .map_err(|e| GarminError::Database(format!("Failed to query tasks: {}", e)))?;
 
         for row in rows {
@@ -909,10 +931,16 @@ mod tests {
         let id_health = db.push_task(&task_health).unwrap();
         let id_perf = db.push_task(&task_perf).unwrap();
 
-        let popped_perf = db.pop_task_by_type(1, "performance", None).unwrap().unwrap();
+        let popped_perf = db
+            .pop_task_by_type(1, "performance", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(popped_perf.id, Some(id_perf));
 
-        let popped_health = db.pop_task_by_type(1, "daily_health", None).unwrap().unwrap();
+        let popped_health = db
+            .pop_task_by_type(1, "daily_health", None)
+            .unwrap()
+            .unwrap();
         assert_eq!(popped_health.id, Some(id_health));
     }
 
@@ -938,10 +966,16 @@ mod tests {
         let id_frontier = db.push_task(&task_frontier).unwrap();
         let id_backfill = db.push_task(&task_backfill).unwrap();
 
-        let popped_backfill = db.pop_task(1, Some(SyncPipeline::Backfill)).unwrap().unwrap();
+        let popped_backfill = db
+            .pop_task(1, Some(SyncPipeline::Backfill))
+            .unwrap()
+            .unwrap();
         assert_eq!(popped_backfill.id, Some(id_backfill));
 
-        let popped_frontier = db.pop_task(1, Some(SyncPipeline::Frontier)).unwrap().unwrap();
+        let popped_frontier = db
+            .pop_task(1, Some(SyncPipeline::Frontier))
+            .unwrap()
+            .unwrap();
         assert_eq!(popped_frontier.id, Some(id_frontier));
     }
 
