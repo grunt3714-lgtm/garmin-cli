@@ -174,7 +174,7 @@ jobs:
     needs: release
     if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
     env:
-      HOMEBREW_TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY || 'vicentereig/homebrew-garmin-cli' }}
+      HOMEBREW_TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY || 'vicentereig/homebrew-tap' }}
       HOMEBREW_FORMULA_NAME: garmin
     steps:
       - name: Resolve tag

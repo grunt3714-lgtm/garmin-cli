@@ -1,16 +1,15 @@
 # Release Guide
 
-This repo publishes tagged releases to GitHub and can update a dedicated Homebrew tap automatically.
+This repo publishes tagged releases to GitHub and can update the shared Homebrew tap automatically.
 
 ## One-Time Homebrew Setup
 
 Do this before the first tagged release that should update Homebrew:
 
-1. Create a new repository named `homebrew-garmin-cli` under `vicentereig`.
-2. Give it a default branch (`main`) and at least one initial commit (a README is enough).
-3. Create a fine-grained personal access token that has `Contents: Read and write` access to that tap repo.
-4. Add that token to the `garmin-cli` repo as the `HOMEBREW_TAP_TOKEN` Actions secret.
-5. If you use a different tap repo name, set the `HOMEBREW_TAP_REPOSITORY` repository variable in `garmin-cli` to `<owner>/<repo>`.
+1. Ensure `vicentereig/homebrew-tap` exists and has a default branch.
+2. Create a fine-grained personal access token that has `Contents: Read and write` access to that tap repo.
+3. Add that token to the `garmin-cli` repo as the `HOMEBREW_TAP_TOKEN` Actions secret.
+4. Only if you want to override the shared tap, set the `HOMEBREW_TAP_REPOSITORY` repository variable in `garmin-cli` to `<owner>/<repo>`.
 
 The workflow generates `Formula/garmin.rb` from the release `checksums.txt`, so the tap repo does not need a pre-existing formula file.
 
@@ -43,6 +42,6 @@ For tags matching `v*`, the workflow:
 3. Verify installation:
 
 ```bash
-brew install vicentereig/garmin-cli/garmin
+brew install vicentereig/tap/garmin
 garmin --help
 ```
