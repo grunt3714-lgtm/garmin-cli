@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/garmin-cli"]
 
 [workspace.package]
-version = "1.1.0"
+version = "2.0.0"
 edition = "2021"
 authors = ["Vicente Reig Rincon de Arellano <hey@vicente.services>"]
 license = "MIT"
