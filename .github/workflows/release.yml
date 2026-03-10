@@ -172,7 +172,6 @@ jobs:
     name: Update Homebrew formula
     runs-on: ubuntu-latest
     needs: release
-    if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
     env:
       HOMEBREW_TAP_REPOSITORY: ${{ vars.HOMEBREW_TAP_REPOSITORY || 'vicentereig/homebrew-tap' }}
       HOMEBREW_FORMULA_NAME: garmin
@@ -185,13 +184,26 @@ jobs:
           else
             echo "value=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
+      - name: Check tap token
+        id: tap-token
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -n "$HOMEBREW_TAP_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "HOMEBREW_TAP_TOKEN not configured; skipping Homebrew update."
+          fi
       - name: Checkout tap repository
+        if: steps.tap-token.outputs.present == 'true'
         uses: actions/checkout@v4
         with:
           repository: ${{ env.HOMEBREW_TAP_REPOSITORY }}
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
       - name: Update formula
+        if: steps.tap-token.outputs.present == 'true'
         run: |
           set -euo pipefail
           TAG="${{ steps.tag.outputs.value }}"
@@ -270,6 +282,7 @@ jobs:
           end
           EOF
       - name: Commit and push
+        if: steps.tap-token.outputs.present == 'true'
         working-directory: homebrew-tap
         run: |
           set -euo pipefail
