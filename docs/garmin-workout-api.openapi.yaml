@@ -1,0 +1,744 @@
+openapi: 3.1.0
+info:
+  title: Garmin Connect Workout API
+  description: |
+    Reverse-engineered Garmin Connect Workout Service API.
+
+    **Base URLs:**
+    - Mobile API: `https://connectapi.garmin.com`
+    - Web proxy: `https://connect.garmin.com/gc-api`
+
+    **Authentication:**
+    - Mobile: OAuth2 Bearer token via `Authorization: Bearer <token>`
+    - Web: Session cookies + `NK: NT` header (CSRF protection)
+
+    **Web app default headers** (from jQuery.ajaxSettings):
+    ```
+    NK: NT
+    X-app-ver: 5.22.0.21b
+    X-lang: en-US
+    ```
+
+    **Pace values** are in m/s. To convert min/km to m/s: `speed_mps = 1000.0 / (pace_min_per_km * 60)`.
+    In pace targets, `targetValueOne` is the faster bound (higher m/s), `targetValueTwo` is the slower bound.
+  version: "1.0.0"
+
+servers:
+  - url: https://connectapi.garmin.com
+    description: Mobile API (OAuth2 Bearer auth)
+  - url: https://connect.garmin.com/gc-api
+    description: Web proxy (session cookie + NK header)
+
+security:
+  - bearerAuth: []
+
+paths:
+  /workout-service/workouts:
+    get:
+      operationId: listWorkouts
+      summary: List workouts
+      parameters:
+        - name: start
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: myWorkoutsOnly
+          in: query
+          schema:
+            type: boolean
+            default: true
+        - name: sharedWorkoutsOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: includeAtp
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: List of workouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkoutSummary"
+
+  /workout-service/workout:
+    post:
+      operationId: createWorkout
+      summary: Create a new workout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkoutCreate"
+      responses:
+        "200":
+          description: Created workout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workout"
+
+  /workout-service/workout/{workoutId}:
+    get:
+      operationId: getWorkout
+      summary: Get a single workout with full step details
+      parameters:
+        - name: workoutId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: includeAudioNotes
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Full workout object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workout"
+        "404":
+          description: Workout not found
+
+    put:
+      operationId: updateWorkout
+      summary: Update an existing workout
+      parameters:
+        - name: workoutId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Workout"
+      responses:
+        "200":
+          description: Updated workout
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workout"
+
+    delete:
+      operationId: deleteWorkout
+      summary: Delete a workout
+      parameters:
+        - name: workoutId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Workout deleted
+
+  /workout-service/workout/FIT/{workoutId}:
+    get:
+      operationId: downloadWorkoutFit
+      summary: Download workout as FIT file
+      parameters:
+        - name: workoutId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: FIT file binary
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+
+  /workout-service/schedule/{workoutId}:
+    post:
+      operationId: scheduleWorkout
+      summary: Schedule a workout to a calendar date
+      parameters:
+        - name: workoutId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date:
+                  type: string
+                  format: date
+                  description: "Date in YYYY-MM-DD format"
+      responses:
+        "200":
+          description: Workout scheduled
+
+  /workout-service/schedule/{scheduleId}:
+    delete:
+      operationId: unscheduleWorkout
+      summary: Remove a scheduled workout
+      parameters:
+        - name: scheduleId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Schedule removed
+
+  /workout-service/workout/types:
+    get:
+      operationId: getWorkoutTypes
+      summary: Get all workout type enumerations (step types, targets, conditions, etc.)
+      responses:
+        "200":
+          description: All workout type definitions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutTypeDefinitions"
+
+  /workout-service/workout/types/sport:
+    get:
+      operationId: getSportTypes
+      summary: Get available sport types for workouts
+      responses:
+        "200":
+          description: List of sport types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SportType"
+
+  /biometric-service/heartRateZones/:
+    get:
+      operationId: getHeartRateZones
+      summary: Get user heart rate zones
+      responses:
+        "200":
+          description: Heart rate zone definitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HeartRateZone"
+
+  /biometric-service/powerZones/sports/all:
+    get:
+      operationId: getPowerZones
+      summary: Get user power zones for all sports
+      responses:
+        "200":
+          description: Power zone definitions
+          content:
+            application/json:
+              schema:
+                type: object
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: OAuth2 access token from Garmin SSO
+
+  schemas:
+    SportType:
+      type: object
+      required: [sportTypeId, sportTypeKey]
+      properties:
+        sportTypeId:
+          type: integer
+          description: |
+            Known values:
+            - 1: running
+            - 2: cycling
+            - 3: swimming (some sources)
+            - 4: swimming or walking (varies)
+            - 5: strength_training or multi_sport
+            - 6: cardio_training or fitness_equipment
+            - 7: yoga or hiking
+            - 8: pilates or other
+            - 9: hiit
+        sportTypeKey:
+          type: string
+          enum:
+            - running
+            - cycling
+            - swimming
+            - walking
+            - strength_training
+            - cardio_training
+            - yoga
+            - pilates
+            - hiit
+            - hiking
+            - other
+            - multi_sport
+            - fitness_equipment
+        displayOrder:
+          type: integer
+
+    StepType:
+      type: object
+      required: [stepTypeId, stepTypeKey]
+      properties:
+        stepTypeId:
+          type: integer
+          description: |
+            1=warmup, 2=cooldown, 3=interval, 4=recovery,
+            5=rest, 6=repeat, 7=other
+        stepTypeKey:
+          type: string
+          enum: [warmup, cooldown, interval, recovery, rest, repeat, other]
+        displayOrder:
+          type: integer
+
+    ConditionType:
+      type: object
+      required: [conditionTypeId, conditionTypeKey]
+      properties:
+        conditionTypeId:
+          type: integer
+          description: |
+            1=lap.button, 2=time, 3=distance, 4=calories,
+            7=iterations, 10=reps
+        conditionTypeKey:
+          type: string
+          enum: [lap.button, time, distance, calories, iterations, reps]
+        displayOrder:
+          type: integer
+        displayable:
+          type: boolean
+
+    TargetType:
+      type: object
+      required: [workoutTargetTypeId, workoutTargetTypeKey]
+      properties:
+        workoutTargetTypeId:
+          type: integer
+          description: |
+            1=no.target, 2=power.zone, 3=cadence.zone,
+            4=heart.rate.zone, 5=speed.zone, 6=pace.zone
+        workoutTargetTypeKey:
+          type: string
+          enum:
+            - no.target
+            - power.zone
+            - cadence.zone
+            - heart.rate.zone
+            - speed.zone
+            - pace.zone
+            - swim.css.offset
+            - swim.instruction
+        displayOrder:
+          type: integer
+
+    DistanceUnit:
+      type: object
+      properties:
+        unitId:
+          type: integer
+        unitKey:
+          type: string
+          enum: [meter, m, km, kilometer, mile, yard]
+        factor:
+          type: number
+
+    StrokeType:
+      type: object
+      properties:
+        strokeTypeId:
+          type: integer
+          description: |
+            1=any_stroke, 2=backstroke, 3=breaststroke, 4=drill,
+            5=fly, 6=free, 7=individual_medley, 8=mixed,
+            9=individual_medley_by_round, 10=reverse_individual_medley_by_round
+        strokeTypeKey:
+          type: string
+        displayOrder:
+          type: integer
+
+    EquipmentType:
+      type: object
+      properties:
+        equipmentTypeId:
+          type: integer
+          description: "1=fins, 2=kickboard, 3=paddles, 4=pull_buoy, 5=snorkel"
+        equipmentTypeKey:
+          type: string
+        displayOrder:
+          type: integer
+
+    ExecutableStepDTO:
+      type: object
+      required: [type, stepOrder, stepType, endCondition, targetType]
+      properties:
+        type:
+          type: string
+          const: ExecutableStepDTO
+        stepId:
+          type: integer
+          nullable: true
+        stepOrder:
+          type: integer
+          description: 1-based order within parent (segment or repeat group)
+        childStepId:
+          type: integer
+          nullable: true
+          description: "Set to 1 for steps inside a RepeatGroupDTO, null for top-level steps"
+        stepType:
+          $ref: "#/components/schemas/StepType"
+        description:
+          type: string
+          nullable: true
+        stepAudioNote:
+          type: string
+          nullable: true
+        endCondition:
+          $ref: "#/components/schemas/ConditionType"
+        endConditionValue:
+          type: number
+          nullable: true
+          description: |
+            Value depends on conditionTypeKey:
+            - time: seconds (e.g. 600.0 = 10 min)
+            - distance: meters (e.g. 1000.0 = 1 km)
+            - calories: calorie count
+            - lap.button: 0.0 or null
+            - iterations: repeat count
+            - reps: rep count
+        endConditionCompare:
+          type: string
+          nullable: true
+        endConditionZone:
+          type: integer
+          nullable: true
+        preferredEndConditionUnit:
+          $ref: "#/components/schemas/DistanceUnit"
+        targetType:
+          $ref: "#/components/schemas/TargetType"
+        targetValueOne:
+          type: number
+          nullable: true
+          description: |
+            For pace.zone: faster bound in m/s (higher value).
+            For power.zone/cadence.zone: lower bound.
+            For speed.zone: lower bound in m/s.
+        targetValueTwo:
+          type: number
+          nullable: true
+          description: |
+            For pace.zone: slower bound in m/s (lower value).
+            For power.zone/cadence.zone: upper bound.
+            For speed.zone: upper bound in m/s.
+        targetValueUnit:
+          type: string
+          nullable: true
+        zoneNumber:
+          type: integer
+          nullable: true
+          description: "HR zone number 1-5 (used with heart.rate.zone target)"
+        secondaryTargetType:
+          $ref: "#/components/schemas/TargetType"
+        secondaryTargetValueOne:
+          type: number
+          nullable: true
+        secondaryTargetValueTwo:
+          type: number
+          nullable: true
+        secondaryTargetValueUnit:
+          type: string
+          nullable: true
+        secondaryZoneNumber:
+          type: integer
+          nullable: true
+        strokeType:
+          $ref: "#/components/schemas/StrokeType"
+        equipmentType:
+          $ref: "#/components/schemas/EquipmentType"
+
+    RepeatGroupDTO:
+      type: object
+      required: [type, stepOrder, stepType, numberOfIterations, workoutSteps]
+      properties:
+        type:
+          type: string
+          const: RepeatGroupDTO
+        stepId:
+          type: integer
+          nullable: true
+        stepOrder:
+          type: integer
+        childStepId:
+          type: integer
+          nullable: true
+        stepType:
+          $ref: "#/components/schemas/StepType"
+          description: "Always stepTypeId=6, stepTypeKey=repeat"
+        numberOfIterations:
+          type: integer
+          minimum: 1
+        smartRepeat:
+          type: boolean
+          default: false
+        endCondition:
+          $ref: "#/components/schemas/ConditionType"
+          description: "Always conditionTypeKey=iterations"
+        endConditionValue:
+          type: number
+          description: "Must match numberOfIterations"
+        preferredEndConditionUnit:
+          type: string
+          nullable: true
+        skipLastRestStep:
+          type: boolean
+          default: false
+        workoutSteps:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExecutableStepDTO"
+          description: "Steps within the repeat group. Each must have childStepId=1."
+
+    WorkoutStep:
+      oneOf:
+        - $ref: "#/components/schemas/ExecutableStepDTO"
+        - $ref: "#/components/schemas/RepeatGroupDTO"
+      discriminator:
+        propertyName: type
+        mapping:
+          ExecutableStepDTO: "#/components/schemas/ExecutableStepDTO"
+          RepeatGroupDTO: "#/components/schemas/RepeatGroupDTO"
+
+    WorkoutSegment:
+      type: object
+      required: [segmentOrder, sportType, workoutSteps]
+      properties:
+        segmentOrder:
+          type: integer
+          minimum: 1
+        sportType:
+          $ref: "#/components/schemas/SportType"
+        workoutSteps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkoutStep"
+
+    Workout:
+      type: object
+      required: [workoutName, sportType, workoutSegments]
+      properties:
+        workoutId:
+          type: integer
+          format: int64
+          description: "Present in responses and PUT requests. Omit for POST (create)."
+        workoutUuid:
+          type: string
+          format: uuid
+        ownerId:
+          type: integer
+          format: int64
+        workoutName:
+          type: string
+          maxLength: 32
+        description:
+          type: string
+          nullable: true
+        sportType:
+          $ref: "#/components/schemas/SportType"
+        subSportType:
+          type: object
+          nullable: true
+        workoutProvider:
+          type: string
+          nullable: true
+        workoutPhrase:
+          type: string
+          nullable: true
+        trainingEffectLabel:
+          type: string
+          nullable: true
+        estimatedTrainingEffect:
+          type: number
+          nullable: true
+        estimatedDurationInSecs:
+          type: number
+          nullable: true
+        estimatedDistanceInMeters:
+          type: number
+          nullable: true
+        estimateType:
+          type: string
+          nullable: true
+        avgTrainingSpeed:
+          type: number
+          nullable: true
+        estimatedDistanceUnit:
+          type: object
+          nullable: true
+          properties:
+            unitKey:
+              type: string
+              nullable: true
+        createdDate:
+          type: string
+          format: date-time
+        updatedDate:
+          type: string
+          format: date-time
+        author:
+          type: object
+          nullable: true
+        workoutSegments:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkoutSegment"
+
+    WorkoutCreate:
+      type: object
+      description: |
+        Same as Workout but omit workoutId, ownerId, createdDate, updatedDate.
+        The API will assign these on creation.
+      required: [workoutName, sportType, workoutSegments]
+      properties:
+        workoutName:
+          type: string
+          maxLength: 32
+        description:
+          type: string
+          nullable: true
+        sportType:
+          $ref: "#/components/schemas/SportType"
+        subSportType:
+          type: object
+          nullable: true
+        estimatedDurationInSecs:
+          type: number
+          nullable: true
+        estimatedDistanceInMeters:
+          type: number
+          nullable: true
+        estimatedDistanceUnit:
+          type: object
+          nullable: true
+          properties:
+            unitKey:
+              type: string
+              nullable: true
+        avgTrainingSpeed:
+          type: number
+          nullable: true
+        estimateType:
+          type: string
+          nullable: true
+        workoutSegments:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkoutSegment"
+
+    WorkoutSummary:
+      type: object
+      description: "Abbreviated workout returned in list responses"
+      properties:
+        workoutId:
+          type: integer
+          format: int64
+        workoutUuid:
+          type: string
+          format: uuid
+        ownerId:
+          type: integer
+          format: int64
+        workoutName:
+          type: string
+        sportType:
+          $ref: "#/components/schemas/SportType"
+        estimatedDurationInSecs:
+          type: number
+          nullable: true
+        estimatedDistanceInMeters:
+          type: number
+          nullable: true
+        createdDate:
+          type: string
+          format: date-time
+        updatedDate:
+          type: string
+          format: date-time
+
+    WorkoutTypeDefinitions:
+      type: object
+      description: "Full type enumeration response from /workout/types"
+      properties:
+        sportTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/SportType"
+        stepTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepType"
+        conditionTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConditionType"
+        targetTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/TargetType"
+        strokeTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/StrokeType"
+        equipmentTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/EquipmentType"
+
+    HeartRateZone:
+      type: object
+      properties:
+        zoneName:
+          type: string
+        zoneNumber:
+          type: integer
+        zoneLowBoundary:
+          type: integer
+          description: Low boundary in BPM
+        zoneHighBoundary:
+          type: integer
+          description: High boundary in BPM
