@@ -147,10 +147,7 @@ impl SsoClient {
         password: &str,
         mfa_callback: Option<impl FnOnce() -> String>,
     ) -> Result<(OAuth1Token, OAuth2Token)> {
-        let service_url = format!(
-            "https://mobile.integration.{}/gcm/android",
-            self.domain
-        );
+        let service_url = format!("https://mobile.integration.{}/gcm/android", self.domain);
         let login_params = [
             ("clientId", CLIENT_ID),
             ("locale", "en-US"),
@@ -201,14 +198,20 @@ impl SsoClient {
         if !status_code.is_success() && status_code.as_u16() != 200 {
             let body = response.text().await.unwrap_or_default();
             return Err(GarminError::auth(format!(
-                "SSO HTTP {}: {}", status_code, &body[..body.len().min(200)]
+                "SSO HTTP {}: {}",
+                status_code,
+                &body[..body.len().min(200)]
             )));
         }
 
         let body_text = response.text().await.map_err(GarminError::Http)?;
 
         let sso_resp: SsoResponse = serde_json::from_str(&body_text).map_err(|e| {
-            GarminError::invalid_response(format!("Failed to parse SSO response: {} | body: {}", e, &body_text[..body_text.len().min(200)]))
+            GarminError::invalid_response(format!(
+                "Failed to parse SSO response: {} | body: {}",
+                e,
+                &body_text[..body_text.len().min(200)]
+            ))
         })?;
 
         let resp_type = sso_resp
@@ -228,8 +231,7 @@ impl SsoClient {
                     .and_then(|info| info.mfa_last_method_used)
                     .unwrap_or_else(|| "email".to_string());
 
-                let mfa_code = mfa_callback
-                    .ok_or_else(|| GarminError::MfaRequired)?();
+                let mfa_code = mfa_callback.ok_or_else(|| GarminError::MfaRequired)?();
 
                 self.submit_mfa(&mfa_code, &mfa_method, &login_params)
                     .await?
@@ -327,14 +329,8 @@ impl SsoClient {
     async fn get_oauth1_token(&self, ticket: &str) -> Result<OAuth1Token> {
         let consumer = self.fetch_oauth_consumer().await?;
 
-        let base_url = format!(
-            "https://connectapi.{}/oauth-service/oauth/",
-            self.domain
-        );
-        let login_url = format!(
-            "https://mobile.integration.{}/gcm/android",
-            self.domain
-        );
+        let base_url = format!("https://connectapi.{}/oauth-service/oauth/", self.domain);
+        let login_url = format!("https://mobile.integration.{}/gcm/android", self.domain);
         let url = format!(
             "{}preauthorized?ticket={}&login-url={}&accepts-mfa-tokens=true",
             base_url, ticket, login_url
@@ -382,8 +378,7 @@ impl SsoClient {
             .clone();
         let mfa_token = params.get("mfa_token").cloned();
 
-        let mut token =
-            OAuth1Token::new(oauth_token, oauth_token_secret).with_domain(&self.domain);
+        let mut token = OAuth1Token::new(oauth_token, oauth_token_secret).with_domain(&self.domain);
 
         if let Some(mfa) = mfa_token {
             token = token.with_mfa(mfa, None);
@@ -509,10 +504,7 @@ mod tests {
             "serviceTicketId": "ST-12345-abc"
         }"#;
         let resp: SsoResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            resp.response_status.unwrap().response_type,
-            "SUCCESSFUL"
-        );
+        assert_eq!(resp.response_status.unwrap().response_type, "SUCCESSFUL");
         assert_eq!(resp.service_ticket_id.unwrap(), "ST-12345-abc");
     }
 
@@ -523,12 +515,12 @@ mod tests {
             "customerMfaInfo": {"mfaLastMethodUsed": "email"}
         }"#;
         let resp: SsoResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.response_status.unwrap().response_type, "MFA_REQUIRED");
         assert_eq!(
-            resp.response_status.unwrap().response_type,
-            "MFA_REQUIRED"
-        );
-        assert_eq!(
-            resp.customer_mfa_info.unwrap().mfa_last_method_used.unwrap(),
+            resp.customer_mfa_info
+                .unwrap()
+                .mfa_last_method_used
+                .unwrap(),
             "email"
         );
     }
