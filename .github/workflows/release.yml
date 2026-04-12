@@ -124,13 +124,25 @@ jobs:
     name: Publish to crates.io
     runs-on: ubuntu-latest
     needs: tests
-    if: ${{ github.event_name == 'push' && secrets.CARGO_REGISTRY_TOKEN != '' }}
+    if: ${{ github.event_name == 'push' }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_REF }}
       - uses: dtolnay/rust-toolchain@stable
+      - name: Check crates token
+        id: crates-token
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "CARGO_REGISTRY_TOKEN not configured; skipping crates.io publish."
+          fi
       - name: Publish
+        if: steps.crates-token.outputs.present == 'true'
         run: cargo publish --locked -p garmin-cli
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
