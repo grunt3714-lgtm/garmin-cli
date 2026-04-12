@@ -1260,10 +1260,7 @@ pub async fn race_predictions(date: Option<String>, profile: Option<String>) -> 
     );
 
     let data: serde_json::Value = client.get_json(&oauth2, &path).await?;
-    let entry = data
-        .as_array()
-        .and_then(|arr| arr.first())
-        .unwrap_or(&data);
+    let entry = data.as_array().and_then(|arr| arr.first()).unwrap_or(&data);
 
     println!("Race Predictions for {}", date);
     println!("{}", "-".repeat(50));
