@@ -1,31 +1,37 @@
 # garmin-cli
 
+[![CI](https://github.com/grunt3714-lgtm/garmin-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/grunt3714-lgtm/garmin-cli/actions/workflows/ci.yml)
+[![Release](https://github.com/grunt3714-lgtm/garmin-cli/actions/workflows/release.yml/badge.svg)](https://github.com/grunt3714-lgtm/garmin-cli/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/grunt3714-lgtm/garmin-cli?display_name=tag)](https://github.com/grunt3714-lgtm/garmin-cli/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Garmin Connect CLI built with Rust.
+
+This fork focuses on:
+- Linux release binaries
+- working Garmin auth
+- OpenClaw integration
+- health and training analysis workflows
+
+## Project Status
+
+- **Build status:** tracked by the CI badge above
+- **Release status:** tracked by the release workflow badge above
+- **Latest downloadable binary:** linked by the latest release badge above
+- **Current release target:** Linux amd64
 
 ## Installation
 
-### Homebrew (macOS/Linux)
-
-```bash
-brew install vicentereig/tap/garmin
-```
-
-Or tap first, then install:
-
-```bash
-brew tap vicentereig/tap
-brew install garmin
-```
-
-### Cargo
-
-```bash
-cargo install garmin-cli
-```
-
 ### Binary Download
 
-Pre-built binaries for macOS and Linux (amd64/arm64) are available on the [releases page](https://github.com/vicentereig/garmin-cli/releases).
+Pre-built Linux amd64 binaries are available on the [releases page](https://github.com/grunt3714-lgtm/garmin-cli/releases).
+
+### Build from source
+
+```bash
+cargo build --release
+install -Dm755 target/release/garmin ~/.local/bin/garmin
+```
 
 ## Authentication
 
